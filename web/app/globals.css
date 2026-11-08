@@ -1,0 +1,57 @@
+@import 'tailwindcss';
+
+:root {
+  --navy: #0b2545;
+  --gold: #f2c14e;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #f6f7f9;
+}
+
+/* Amplify sign-in card: soften to match the app */
+[data-amplify-authenticator] [data-amplify-router] {
+  border-radius: 16px;
+  border: 1px solid #e7e5e4;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  overflow: hidden;
+}
+
+.field-label {
+  @apply mb-1 block text-sm font-medium text-stone-800;
+}
+.field-input {
+  @apply w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-base text-stone-900 shadow-xs outline-none focus:border-[#0b2545] focus:ring-2 focus:ring-[#0b2545]/20;
+}
+.field-hint {
+  @apply mt-1 text-xs text-stone-500;
+}
+.field-error {
+  @apply mt-1 text-sm text-rose-700;
+}
+
+/* Amplify sign-in colours: navy instead of the default teal */
+html [data-amplify-theme],
+[data-amplify-authenticator] {
+  --amplify-colors-primary-10: #e8eef6;
+  --amplify-colors-primary-20: #c9d6e8;
+  --amplify-colors-primary-40: #6f8db5;
+  --amplify-colors-primary-60: #2c4f7c;
+  --amplify-colors-primary-80: #0b2545;
+  --amplify-colors-primary-90: #08182e;
+  --amplify-colors-primary-100: #050f1d;
+  --amplify-colors-font-interactive: #0b2545;
+  --amplify-components-tabs-item-active-color: #0b2545;
+  --amplify-components-tabs-item-active-border-color: #0b2545;
+  --amplify-components-button-primary-background-color: #0b2545;
+  --amplify-components-button-primary-hover-background-color: #08182e;
+  --amplify-components-button-primary-focus-background-color: #08182e;
+  --amplify-components-button-primary-active-background-color: #050f1d;
+  --amplify-components-button-link-color: #0b2545;
+  --amplify-components-authenticator-router-border-color: #e7e5e4;
+}

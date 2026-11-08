@@ -1,0 +1,13 @@
+{
+  "name": "RMG Helpdesk",
+  "short_name": "RMG Helpdesk",
+  "description": "Report and track maintenance and facilities issues across Royal Museums Greenwich.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f7f9",
+  "theme_color": "#0b2545",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

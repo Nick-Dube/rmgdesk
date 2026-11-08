@@ -1,0 +1,23 @@
+{
+  "name": "rmgdesk-infra",
+  "version": "0.1.0",
+  "private": true,
+  "bin": { "rmgdesk": "bin/rmgdesk.js" },
+  "scripts": {
+    "build": "tsc",
+    "synth": "cdk synth",
+    "diff": "cdk diff",
+    "deploy": "cdk deploy"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "aws-cdk": "^2.1000.0",
+    "esbuild": "^0.25.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.260.0",
+    "constructs": "^10.4.0"
+  }
+}

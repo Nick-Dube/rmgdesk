@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, staging]
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root
+          MYSQL_DATABASE: rmgdesk
+        ports: ['3306:3306']
+        options: --health-cmd="mysqladmin ping -pci-root" --health-interval=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: api/package-lock.json }
+      - name: Apply migrations
+        run: |
+          curl -fsSL -o /usr/local/bin/dbmate https://github.com/amacneil/dbmate/releases/latest/download/dbmate-linux-amd64
+          chmod +x /usr/local/bin/dbmate
+          dbmate --url "mysql://root:ci-root@127.0.0.1:3306/rmgdesk" --migrations-dir db/migrations --no-dump-schema up
+      - run: npm ci
+        working-directory: api
+      - name: Unit and end-to-end tests
+        working-directory: api
+        env: { DB_HOST: 127.0.0.1, DB_USER: root, DB_PASSWORD: ci-root, DB_SSL: 'false', AWS_REGION: eu-west-2 }
+        run: npm test
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: web/package-lock.json }
+      - run: npm ci
+        working-directory: web
+      - run: cp .env.example .env.local && npm run build
+        working-directory: web
+
+  infra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+        working-directory: api
+      - run: npm ci
+        working-directory: infra
+      - run: npx cdk synth -c env=prod --quiet && npx cdk synth -c env=staging --quiet
+        working-directory: infra
+        env: { CDK_DISABLE_VERSION_CHECK: '1' }
