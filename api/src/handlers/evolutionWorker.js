@@ -5,7 +5,7 @@
 
 const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
 const { query } = require('../lib/db');
-const { buildRaiseTaskXml, buildEndpoint, extractTaskNumber } = require('../lib/evolution');
+const { buildRaiseTaskXml, buildEndpoint, extractTaskNumber, checkEvolutionResponse } = require('../lib/evolution');
 
 const secrets = new SecretsManagerClient({});
 let secretCache;
@@ -23,7 +23,8 @@ async function getEvolutionSecret() {
 async function loadTicket(ticketId) {
   const rows = await query(
     `SELECT t.*, s.code AS site_code, b.name AS building_name, b.legacy_label AS building_legacy_label,
-            c.name AS category_name, u.full_name AS requester_name, u.email AS requester_email
+            c.name AS category_name, u.full_name AS requester_name, u.email AS requester_email,
+            (SELECT COUNT(*) FROM attachments a WHERE a.ticket_id = t.id) AS attachment_count
        FROM tickets t
        JOIN sites s ON s.id = t.site_id
        JOIN buildings b ON b.id = t.building_id
@@ -51,20 +52,24 @@ async function processJob(msg) {
 
   const ticket = await loadTicket(job.ticket_id);
   const appUrl = process.env.APP_URL || 'https://app.rmgdesk.com';
-  const xml = buildRaiseTaskXml(ticket, appUrl);
+  const xml = buildRaiseTaskXml(ticket, appUrl, { reqIdPrefix: secret.reqIdPrefix });
   await query("UPDATE integration_jobs SET status = 'sent', attempts = attempts + 1, request = ? WHERE id = ?", [xml, job.id]);
 
   const res = await fetch(buildEndpoint(secret), {
     method: 'POST',
-    headers: { 'content-type': 'text/xml; charset=utf-8' },
+    headers: { 'content-type': 'text/xml' }, // exactly what the Integrately step sends
     body: xml,
+    redirect: 'manual', // Evolution signals failure by redirecting to its error page: never follow it
     signal: AbortSignal.timeout(30000),
   });
   const text = await res.text();
 
-  if (!res.ok) {
-    await query("UPDATE integration_jobs SET status = 'failed', response = ? WHERE id = ?", [`HTTP ${res.status}\n${text}`.slice(0, 60000), job.id]);
-    throw new Error(`MRI Evolution returned HTTP ${res.status}`);
+  const verdict = checkEvolutionResponse(res.status, text);
+  if (!verdict.ok) {
+    const location = res.headers.get('location');
+    const detail = `${verdict.reason}\nHTTP ${res.status}${location ? `\nLocation: ${location}` : ''}\n${text}`;
+    await query("UPDATE integration_jobs SET status = 'failed', response = ? WHERE id = ?", [detail.slice(0, 60000), job.id]);
+    throw new Error(verdict.reason);
   }
 
   const taskNo = extractTaskNumber(text);
