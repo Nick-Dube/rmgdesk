@@ -147,7 +147,7 @@ export class RmgDeskStack extends Stack {
         secretStringTemplate: JSON.stringify({
           url: 'https://vertex.fsicloud.com/Evolution/webservices/workflowrest.aspx',
           workflow: 'RMGRaiseTask',
-          username: 'CHANGE_ME',
+          username: 'VTXWebservice',
           enabled: false,
         }),
         generateStringKey: 'password',
