@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: 'RMG Helpdesk',
   description: 'Report and track maintenance and facilities issues across Royal Museums Greenwich.',
   manifest: '/manifest.webmanifest',
-  icons: { icon: '/icon.svg', apple: '/icon.svg' },
+  icons: { icon: '/favicon.png', apple: '/apple-touch-icon.png' },
   appleWebApp: { capable: true, title: 'RMG Helpdesk', statusBarStyle: 'default' },
   robots: { index: false, follow: false },
 };

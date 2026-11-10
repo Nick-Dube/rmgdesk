@@ -27,7 +27,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-20 bg-[#0b2545] text-white shadow">
         <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-3">
           <Link href="/" className="flex items-center gap-2 font-semibold">
-            <img src="/icon.svg" alt="" className="h-8 w-8" />
+            <img src="/rmg-logo-white.png" alt="Royal Museums Greenwich" className="h-8 w-auto" />
             <span>RMG Helpdesk</span>
           </Link>
           <nav className="ml-4 hidden gap-1 sm:flex">

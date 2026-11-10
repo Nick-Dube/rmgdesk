@@ -213,8 +213,20 @@ export class RmgDeskStack extends Stack {
       timeout: Duration.seconds(15),
       projectRoot: API_ROOT,
       depsLockFilePath: path.join(API_ROOT, 'package-lock.json'),
-      // Bundle everything, AWS SDK included, so each Lambda runs exactly the versions we tested.
-      bundling: { format: nodejs.OutputFormat.CJS, target: 'node22', minify: true, sourceMap: true, externalModules: [] },
+      // Bundle our code with mysql2 and zod; use the AWS SDK v3 that ships in the Node.js 22 runtime.
+      // Not minified, so the code stays readable in the Lambda console (which cannot open files over 3 MB);
+      // source maps point errors at the original file and line in api/src.
+      // Never edit code in the console: the next deploy overwrites it.
+      bundling: {
+        format: nodejs.OutputFormat.CJS,
+        target: 'node22',
+        minify: false,
+        keepNames: true,
+        sourceMap: true,
+        sourcesContent: false,
+        externalModules: ['@aws-sdk/*'],
+        banner: '/* RMG Desk API - generated from api/src by CDK. Do not edit here: change the repo and deploy. */',
+      },
       tracing: lambda.Tracing.ACTIVE,
     };
     const inVpc: Partial<nodejs.NodejsFunctionProps> = {

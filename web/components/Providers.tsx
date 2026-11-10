@@ -61,7 +61,7 @@ const formFields = {
 function SignInHeader() {
   return (
     <div className="px-8 pt-8 text-center">
-      <img src="/icon.svg" alt="" className="mx-auto h-14 w-14" />
+      <img src="/rmg-logo-black.png" alt="Royal Museums Greenwich" className="mx-auto h-16 w-auto" />
       <h1 className="mt-4 text-xl font-semibold text-[#0b2545]">RMG Helpdesk</h1>
       <p className="mt-1 text-sm text-stone-600">Report and track issues across Royal Museums Greenwich</p>
     </div>
