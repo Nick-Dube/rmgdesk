@@ -34,7 +34,7 @@ test('uploads allow photos and short videos only', () => {
   assert.equal(uploadRequestSchema.safeParse({ fileName: 'big.mp4', contentType: 'video/mp4', size: 60 * 1024 * 1024 }).success, false);
 });
 
-test('Evolution XML matches the format the RMGRaiseTask workflow has always received', () => {
+test('Evolution XML matches the format the RMGRaiseTask workflow reads', () => {
   const xml = buildRaiseTaskXml(
     {
       id: 42,
@@ -49,7 +49,6 @@ test('Evolution XML matches the format the RMGRaiseTask workflow has always rece
       title: 'Radiator <cold> & noisy',
       description: 'It is "cold"',
       location_text: 'Room 1 & 2',
-      attachment_count: 0,
     },
     'https://app.rmgdesk.com',
   );
@@ -59,23 +58,23 @@ test('Evolution XML matches the format the RMGRaiseTask workflow has always rece
       '<building>NMM ~ Neptune Court</building><department>Learning and Engagement</department>' +
       '<category>Heating and Gas</category><location>Room 1 and 2</location><priority>P2</priority>' +
       '<problem>Radiator &lt;cold&gt; &amp; noisy</problem>' +
-      '<description>It is &quot;cold&quot;\r\n\r\nHelpdesk ref RMG-000042: https://app.rmgdesk.com/ticket/?id=42' +
-      '&#13;&#10;&#13;&#10;<![CDATA[No value present]]></description><image>No value present</image></body>',
+      '<description>It is &quot;cold&quot;</description>' +
+      '<image>https://app.rmgdesk.com/ticket/?id=42</image></body>',
   );
   assert.equal(xmlEscape(`'`), '&apos;');
 });
 
-test('Evolution XML carries the ticket link in the image slots when there are photos', () => {
+test('Evolution XML falls back to site and building, and applies an optional Req ID prefix', () => {
   const xml = buildRaiseTaskXml(
     { id: 7, reference: 'RMG-000007', requester_name: 'A', requester_email: 'a@rmg.co.uk', site_code: 'CS', building_name: 'Cutty Sark',
-      category_name: 'Lighting', priority: 'P3', title: 'Lamp out', description: 'x', attachment_count: 2 },
+      category_name: 'Lighting', priority: 'P3', title: 'Lamp out', description: 'x' },
     'https://app.rmgdesk.com',
     { reqIdPrefix: 'VTX600:' },
   );
   assert.match(xml, /^<body><reqid>VTX600:RMG-000007<\/reqid><name>/);
   assert.match(xml, /<building>CS ~ Cutty Sark<\/building>/);
-  assert.match(xml, /<!\[CDATA\[https:\/\/app\.rmgdesk\.com\/ticket\/\?id=7\]\]><\/description>/);
-  assert.match(xml, /<image>https:\/\/app\.rmgdesk\.com\/ticket\/\?id=7<\/image>/);
+  assert.match(xml, /<phone><\/phone><building>/);
+  assert.match(xml, /<image>https:\/\/app\.rmgdesk\.com\/ticket\/\?id=7<\/image><\/body>$/);
 });
 
 test('Evolution endpoint carries the workflow name and credentials server-side', () => {

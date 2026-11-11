@@ -1,13 +1,14 @@
 'use strict';
 // Building the request for the MRI Evolution "RMGRaiseTask" workflow.
 //
-// The format is exactly what the Integrately step has sent since 2021, which is what the workflow's
-// XML nodes read: a <body> root, lower-case element names, no XML declaration, and the link placed
-// twice (inside the description as CDATA, and in <image>), plus <reqid>, which the workflow copies
-// into the task's Req ID (aEvolutionService.CallId) with SelectSingleNode("/body/reqid").
-// The workflow reads every element with SelectSingleNode(...).InnerText, which fails if an element
-// is missing, so never drop one. Do not rename elements without changing the workflow first.
-// Content-Type must be text/xml.
+// The format is what the workflow's nodes read with SelectSingleNode("/body/<element>").InnerText:
+// a <body> root and lower-case element names, the same as the Integrately step has sent since 2021,
+// plus <reqid>, which the workflow copies into the task's Req ID (aEvolutionService.CallId).
+// A missing element makes the workflow fail, so never drop one, and do not rename elements without
+// changing the workflow first. Content-Type must be text/xml.
+//
+// <image> goes into the task's TaskItem field, which Evolution's emails use as the "view your request"
+// link, so it always carries the link to the ticket (photos are private and need a sign-in).
 
 function xmlEscape(value) {
   return String(value ?? '')
@@ -23,27 +24,15 @@ function andEscape(value) {
   return xmlEscape(String(value ?? '').replace(/&/g, 'and'));
 }
 
-/** CDATA cannot contain "]]>": split it if it ever appears. */
-function cdata(value) {
-  return `<![CDATA[${String(value ?? '').replace(/]]>/g, ']]]]><![CDATA[>')}]]>`;
-}
-
-const NO_IMAGE = 'No value present'; // what Integrately sent when the requester attached no photo
-
-/**
- * t: the ticket row joined with site, building, category and requester (see evolutionWorker.loadTicket).
- * The helpdesk reference and a link back to the ticket go at the end of the description, so engineers
- * see them on the task. The image slots carry the ticket link when the ticket has photos (the photos
- * themselves are private and need a sign-in), and "No value present" when it has none, as before.
- */
+/** t: the ticket row joined with site, building, category and requester (see evolutionWorker.loadTicket). */
 function buildRaiseTaskXml(t, appUrl, options = {}) {
-  // Req ID = optional prefix + helpdesk reference, e.g. "VTX600:RMG-000123". The prefix comes from the
-  // "reqIdPrefix" value in the Evolution secret: other Evolution workflows send their emails only for
-  // Req IDs starting with VTX600, so keep the prefix while those emails are wanted and blank it after.
+  // Req ID = optional prefix + helpdesk reference, e.g. "RMG-000123". Evolution's email workflows act on
+  // Req IDs starting with "RMG-". The optional "reqIdPrefix" in the Evolution secret is normally blank.
   const reqId = `${options.reqIdPrefix || ''}${t.reference}`;
   const ticketUrl = `${appUrl}/ticket/?id=${t.id}`;
-  const image = Number(t.attachment_count) > 0 ? ticketUrl : NO_IMAGE;
-  const description = `${t.description}\r\n\r\nHelpdesk ref ${t.reference}: ${ticketUrl}`;
+  // The description is sent as written: the workflow itself appends the <image> link and the location
+  // to the task's long description, and the Req ID carries the RMG reference.
+  const description = t.description;
   return (
     '<body>' +
     `<reqid>${xmlEscape(reqId)}</reqid>` +
@@ -56,8 +45,8 @@ function buildRaiseTaskXml(t, appUrl, options = {}) {
     `<location>${andEscape(t.location_text || '')}</location>` +
     `<priority>${xmlEscape(t.priority)}</priority>` +
     `<problem>${xmlEscape(t.title)}</problem>` +
-    `<description>${xmlEscape(description)}&#13;&#10;&#13;&#10;${cdata(image)}</description>` +
-    `<image>${xmlEscape(image)}</image>` +
+    `<description>${xmlEscape(description)}</description>` +
+    `<image>${xmlEscape(ticketUrl)}</image>` +
     '</body>'
   );
 }
