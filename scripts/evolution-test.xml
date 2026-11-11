@@ -1,3 +1,3 @@
-<body><reqid>VTX600:RMG-TEST</reqid><name>Nick Dube</name><email>nick.dube@vertex.net</email><phone>07000000000</phone><building>NMM ~ Neptune Court</building><department>Vertex</department><category>AC / Environmental Conditions</category><location>Entrance</location><priority>P3</priority><problem>TEST - new Helpdesk link with Evolution - please cancel</problem><description>TEST - new Helpdesk link with Evolution - please cancel this task
+<body><reqid>RMG-TEST</reqid><name>Nick Dube</name><email>nick.dube@vertex.net</email><phone>07000000000</phone><building>NMM ~ Neptune Court</building><department>Vertex</department><category>AC / Environmental Conditions</category><location>Entrance</location><priority>P3</priority><problem>TEST - new Helpdesk link with Evolution - please cancel</problem><description>TEST - new Helpdesk link with Evolution - please cancel this task
 
-Helpdesk ref RMG-TEST: https://app.rmgdesk.com/ticket/?id=3&#13;&#10;&#13;&#10;<![CDATA[No value present]]></description><image>No value present</image></body>
+RMG Desk RMG-TEST: https://app.rmgdesk.com/ticket/?id=3</description><image>https://app.rmgdesk.com/ticket/?id=3</image></body>

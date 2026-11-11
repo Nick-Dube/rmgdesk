@@ -1,0 +1,166 @@
+<!-- RMG Desk: "task raised" confirmation email for the MRI Evolution workflow email node.
+     Paste into the node's HTML/source view. Layout uses tables and inline styles only, so it renders in
+     classic Outlook, new Outlook, Outlook on the web, Gmail and Apple Mail. Text in [square brackets]
+     is filled in by Evolution: do not change the bracketed parts. -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f4f6f8" style="background-color:#f4f6f8;">
+  <tr>
+    <td align="center" style="padding:24px 12px;">
+      <!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%;max-width:600px;background-color:#ffffff;border:1px solid #dfe3e8;">
+
+      <tr>
+        <td align="center" bgcolor="#0a3a78" style="background-color:#0a3a78;padding:22px 24px 24px 24px;">
+          <div style="font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:26px;line-height:32px;font-weight:bold;color:#ffffff;">RMG Desk</div>
+          <div style="font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#c9d6ea;padding-top:4px;">Your request has been logged</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:28px 32px 0 32px;font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:16px;line-height:24px;color:#22272e;">
+          Hi <strong>[RepeatForEach NewEntity.F_BD_DETAILSs][Property BDET_KEY_PERS][/RepeatForEach]</strong>,
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:14px 32px 0 32px;font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:23px;color:#3a4250;">
+          This is to confirm that your request has been received and a task has been raised on the CAFM system. The details are below.
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:26px 32px 0 32px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:18px;line-height:24px;font-weight:bold;color:#0b2545;padding:0 0 8px 0;border-bottom:2px solid #e6eaf0;">&#128203;&nbsp; Your Request</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:12px 32px 0 32px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td width="160" valign="top" style="width:160px;font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;font-weight:bold;color:#3a4250;padding:5px 12px 5px 0;">RMG Job Ref:</td>
+              <td valign="top" style="font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#3a4250;padding:5px 0;color:#0b2545;"><strong>[RepeatForEach NewEntity.F_BD_DETAILSs][Property BDET_CALL_ID][/RepeatForEach]</strong></td>
+            </tr>
+            <tr>
+              <td width="160" valign="top" style="width:160px;font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;font-weight:bold;color:#3a4250;padding:5px 12px 5px 0;">Task ID:</td>
+              <td valign="top" style="font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#3a4250;padding:5px 0;">[Property NewEntity.TA_TASK_ID]</td>
+            </tr>
+            <tr>
+              <td width="160" valign="top" style="width:160px;font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;font-weight:bold;color:#3a4250;padding:5px 12px 5px 0;">Date Raised:</td>
+              <td valign="top" style="font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#3a4250;padding:5px 0;">[Property NewEntity.TA_DATE]</td>
+            </tr>
+            <tr>
+              <td width="160" valign="top" style="width:160px;font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;font-weight:bold;color:#3a4250;padding:5px 12px 5px 0;">Priority:</td>
+              <td valign="top" style="font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#3a4250;padding:5px 0;color:#b42318;"><strong>[Property NewEntity.TA_PRIORITY]</strong></td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:26px 32px 0 32px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:18px;line-height:24px;font-weight:bold;color:#0b2545;padding:0 0 8px 0;border-bottom:2px solid #e6eaf0;">&#128205;&nbsp; Work Location</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:12px 32px 0 32px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td width="160" valign="top" style="width:160px;font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;font-weight:bold;color:#3a4250;padding:5px 12px 5px 0;">Building:</td>
+              <td valign="top" style="font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#3a4250;padding:5px 0;">[Property NewEntity.FLOCATE.BG_SITE]</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:26px 32px 0 32px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:18px;line-height:24px;font-weight:bold;color:#0b2545;padding:0 0 8px 0;border-bottom:2px solid #e6eaf0;">&#128736;&nbsp; Work Description</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:12px 32px 0 32px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td width="160" valign="top" style="width:160px;font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;font-weight:bold;color:#3a4250;padding:5px 12px 5px 0;">Problem:</td>
+              <td valign="top" style="font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#3a4250;padding:5px 0;">[Property NewEntity.TA_SHORT_DESC]</td>
+            </tr>
+            <tr>
+              <td width="160" valign="top" style="width:160px;font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;font-weight:bold;color:#3a4250;padding:5px 12px 5px 0;">Problem Type:</td>
+              <td valign="top" style="font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#3a4250;padding:5px 0;">[Property NewEntity.TA_CATEGORY]</td>
+            </tr>
+            <tr>
+              <td width="160" valign="top" style="width:160px;font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;font-weight:bold;color:#3a4250;padding:5px 12px 5px 0;">Description:</td>
+              <td valign="top" style="font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#3a4250;padding:5px 0;">[Property NewEntity.TA_LONG_DESC]</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:26px 32px 0 32px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:18px;line-height:24px;font-weight:bold;color:#0b2545;padding:0 0 8px 0;border-bottom:2px solid #e6eaf0;">&#128100;&nbsp; Requestor</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:12px 32px 0 32px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td width="160" valign="top" style="width:160px;font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;font-weight:bold;color:#3a4250;padding:5px 12px 5px 0;">Requested By:</td>
+              <td valign="top" style="font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#3a4250;padding:5px 0;">[RepeatForEach NewEntity.F_BD_DETAILSs][Property BDET_KEY_PERS][/RepeatForEach]</td>
+            </tr>
+            <tr>
+              <td width="160" valign="top" style="width:160px;font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;font-weight:bold;color:#3a4250;padding:5px 12px 5px 0;">Phone:</td>
+              <td valign="top" style="font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#3a4250;padding:5px 0;">[RepeatForEach NewEntity.F_BD_DETAILSs][Property BDET_PHONE][/RepeatForEach]</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:26px 32px 0 32px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:18px;line-height:24px;font-weight:bold;color:#0b2545;padding:0 0 8px 0;border-bottom:2px solid #e6eaf0;">&#128247;&nbsp; Request and Photos</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:14px 32px 0 32px;font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:23px;color:#3a4250;">
+          To view your request and any photos you submitted, please <a href="[Property NewEntity.TaskItem]" style="color:#0a58ca;font-weight:bold;text-decoration:underline;">click here</a>.
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:28px 32px 0 32px;font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:15px;line-height:23px;color:#22272e;">
+          Kind regards,<br><strong>RMG Helpdesk</strong>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:28px 0 0 0;font-size:0;line-height:0;">&nbsp;</td>
+      </tr>
+      <tr>
+        <td align="center" bgcolor="#f7f8fa" style="background-color:#f7f8fa;border-top:1px solid #dfe3e8;padding:16px 24px;font-family:'Segoe UI',Calibri,Arial,Helvetica,sans-serif;font-size:13px;line-height:19px;color:#7a828e;">
+          This is an automatic email generated by workflow. Please do not reply.<br>In an emergency, call Security Control on 6555.
+        </td>
+      </tr>
+
+      </table>
+      <!--[if mso]></td></tr></table><![endif]-->
+    </td>
+  </tr>
+</table>
