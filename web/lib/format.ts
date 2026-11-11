@@ -2,7 +2,7 @@ import type { Priority, Status } from './types';
 
 export const STATUS_LABEL: Record<Status, string> = {
   new: 'New',
-  triaged: 'Triaged',
+  triaged: 'Acknowledged',
   assigned: 'Assigned',
   attending: 'Engineer attending',
   made_safe: 'Made safe',
@@ -44,3 +44,38 @@ export function when(iso: string) {
   if (mins < 24 * 60 && new Date().toDateString() === d.toDateString()) return `today ${timeFmt.format(d)}`;
   return `${dateFmt.format(d)}, ${timeFmt.format(d)}`;
 }
+
+export const ROOT_CAUSES: Record<string, string> = {
+  wear_and_tear: 'Wear and tear',
+  user_damage: 'Accidental damage',
+  design_fault: 'Design fault',
+  installation_fault: 'Installation fault',
+  supplier_fault: 'Supplier fault',
+  weather: 'Weather',
+  vandalism: 'Vandalism',
+  unknown: 'Not known',
+  not_recorded: 'Not recorded',
+};
+
+export const ROLE_LABEL: Record<string, string> = {
+  requester: 'Requester',
+  agent: 'Agent',
+  lead: 'Team lead',
+  viewer: 'Viewer',
+  rmg_superuser: 'RMG superuser',
+  vertex_helpdesk: 'Vertex helpdesk',
+  vertex_superuser: 'Vertex superuser',
+};
+
+export const USER_STATUS: Record<string, { label: string; tone: string }> = {
+  invited: { label: 'Invited', tone: 'bg-sky-100 text-sky-900 ring-sky-200' },
+  active: { label: 'Active', tone: 'bg-emerald-100 text-emerald-900 ring-emerald-200' },
+  suspended: { label: 'Suspended', tone: 'bg-amber-100 text-amber-900 ring-amber-200' },
+  disabled: { label: 'Offboarded', tone: 'bg-stone-200 text-stone-700 ring-stone-300' },
+};
+
+export function shortDate(iso: string | null | undefined) {
+  return iso ? dateFmt.format(new Date(iso)) : '';
+}
+
+export const isAdmin = (role?: string) => role === 'rmg_superuser' || role === 'vertex_superuser';

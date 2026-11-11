@@ -21,6 +21,8 @@ import * as apigw from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import { HttpJwtAuthorizer } from 'aws-cdk-lib/aws-apigatewayv2-authorizers';
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as targets from 'aws-cdk-lib/aws-events-targets';
 import { EnvConfig } from './config';
 
 const API_ROOT = path.join(__dirname, '..', '..', 'api');
@@ -284,6 +286,14 @@ export class RmgDeskStack extends Stack {
     const referenceFn = fn('Reference', 'reference.js');
     const ticketsFn = fn('Tickets', 'tickets.js');
     const uploadsFn = fn('Uploads', 'uploads.js');
+    const insightsFn = fn('Insights', 'insights.js', { timeout: Duration.seconds(20) });
+    // Closes requests resolved more than 3 working days ago with no answer from the requester.
+    const autoCloseFn = fn('AutoClose', 'autoClose.js', { timeout: Duration.seconds(60) });
+    new events.Rule(this, 'AutoCloseSchedule', {
+      description: 'Weekdays 07:00 UTC: close resolved requests the requester has not answered',
+      schedule: events.Schedule.cron({ minute: '0', hour: '7', weekDay: 'MON-FRI' }),
+      targets: [new targets.LambdaFunction(autoCloseFn)],
+    });
     const evolutionWorker = fn('EvolutionWorker', 'evolutionWorker.js', {
       timeout: Duration.seconds(60),
       environment: { ...dbEnv, EVOLUTION_SECRET_ARN: evolutionSecret.secretArn },
@@ -308,7 +318,7 @@ export class RmgDeskStack extends Stack {
     notificationsQueue.grantSendMessages(ticketsFn);
     notifier.addEventSource(new SqsEventSource(notificationsQueue, { batchSize: 1, reportBatchItemFailures: true }));
 
-    for (const f of [meFn, referenceFn, ticketsFn, uploadsFn, evolutionWorker, notifier]) {
+    for (const f of [meFn, referenceFn, ticketsFn, uploadsFn, evolutionWorker, notifier, insightsFn, autoCloseFn]) {
       db.secret!.grantRead(f);
     }
     attachments.grantPut(uploadsFn);
@@ -373,6 +383,26 @@ export class RmgDeskStack extends Stack {
         : cognito.UserPoolEmail.withCognito(),
     });
 
+    // Admin console: manages people in the database and in Cognito (invite, suspend, offboard, reset MFA).
+    const adminFn = fn('Admin', 'admin.js', {
+      timeout: Duration.seconds(20),
+      environment: { ...dbEnv, USER_POOL_ID: userPool.userPoolId },
+    });
+    db.secret!.grantRead(adminFn);
+    adminFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: [
+          'cognito-idp:AdminCreateUser',
+          'cognito-idp:AdminDisableUser',
+          'cognito-idp:AdminEnableUser',
+          'cognito-idp:AdminUserGlobalSignOut',
+          'cognito-idp:AdminSetUserMFAPreference',
+          'cognito-idp:AdminUpdateUserAttributes',
+        ],
+        resources: [userPool.userPoolArn],
+      }),
+    );
+
     const webClient = userPool.addClient('WebClient', {
       userPoolClientName: `${prefix}-web`,
       generateSecret: false,
@@ -418,6 +448,15 @@ export class RmgDeskStack extends Stack {
     api.addRoutes({ path: '/tickets', methods: [apigw.HttpMethod.GET, apigw.HttpMethod.POST], integration: ticketsInt });
     api.addRoutes({ path: '/tickets/{id}', methods: [apigw.HttpMethod.GET], integration: ticketsInt });
     api.addRoutes({ path: '/tickets/{id}/comments', methods: [apigw.HttpMethod.POST], integration: ticketsInt });
+    api.addRoutes({ path: '/tickets/{id}/actions', methods: [apigw.HttpMethod.POST], integration: ticketsInt });
+    api.addRoutes({ path: '/tickets/{id}/assignees', methods: [apigw.HttpMethod.GET], integration: ticketsInt });
+    api.addRoutes({ path: '/insights', methods: [apigw.HttpMethod.GET], integration: new HttpLambdaIntegration('InsightsInt', insightsFn) });
+    // One route for the whole admin console; the handler checks the caller is a superuser.
+    api.addRoutes({
+      path: '/admin/{proxy+}',
+      methods: [apigw.HttpMethod.GET, apigw.HttpMethod.POST, apigw.HttpMethod.PUT, apigw.HttpMethod.PATCH, apigw.HttpMethod.DELETE],
+      integration: new HttpLambdaIntegration('AdminInt', adminFn),
+    });
     api.addRoutes({
       path: '/uploads',
       methods: [apigw.HttpMethod.POST],
@@ -446,7 +485,13 @@ export class RmgDeskStack extends Stack {
       notificationsDlq.metricApproximateNumberOfMessagesVisible({ period: Duration.minutes(5) }),
       'A message reached the notifications dead-letter queue: new-ticket emails were not sent.',
     );
-    for (const [id, f] of [['TicketsErrors', ticketsFn], ['EvolutionErrors', evolutionWorker], ['NotifierErrors', notifier]] as const) {
+    for (const [id, f] of [
+      ['TicketsErrors', ticketsFn],
+      ['EvolutionErrors', evolutionWorker],
+      ['NotifierErrors', notifier],
+      ['AdminErrors', adminFn],
+      ['AutoCloseErrors', autoCloseFn],
+    ] as const) {
       alarm(`${id}Alarm`, f.metricErrors({ period: Duration.minutes(5) }), `${f.node.id} Lambda errors`);
     }
 

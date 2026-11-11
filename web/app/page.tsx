@@ -3,20 +3,32 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import type { TicketSummary } from '@/lib/types';
+import type { Reference, TicketSummary } from '@/lib/types';
 import { useMe } from '@/components/MeContext';
 import { TicketList } from '@/components/TicketList';
 
 export default function Home() {
   const me = useMe();
   const [tickets, setTickets] = useState<TicketSummary[] | null>(null);
+  const [assigned, setAssigned] = useState<TicketSummary[] | null>(null);
+  const [notices, setNotices] = useState<Reference['announcements']>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api<{ tickets: TicketSummary[] }>('/tickets?scope=mine&limit=5')
       .then((r) => setTickets(r.tickets))
       .catch((e) => setError(e.message));
+    api<Reference>('/reference')
+      .then((r) => setNotices(r.announcements.filter((a) => !a.siteId && !a.buildingId)))
+      .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!me?.worksTickets) return;
+    api<{ tickets: TicketSummary[] }>('/tickets?scope=assigned&status=open&limit=10')
+      .then((r) => setAssigned(r.tickets))
+      .catch(() => {});
+  }, [me?.worksTickets]);
 
   const firstName = me?.fullName.split(' ')[0];
 
@@ -40,6 +52,28 @@ export default function Home() {
           In an emergency, call Security Control on <strong>6555</strong> first.
         </div>
       </section>
+
+      {notices.length > 0 && (
+        <section className="space-y-2" aria-label="Announcements">
+          {notices.map((n) => (
+            <p key={n.id} className="rounded-2xl border-l-4 border-amber-500 bg-amber-50 px-4 py-3 text-amber-950">
+              {n.message}
+            </p>
+          ))}
+        </section>
+      )}
+
+      {me?.worksTickets && assigned && (
+        <section>
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className="text-lg font-semibold">Assigned to you</h2>
+            <Link href="/tickets/" className="text-sm font-medium text-[#0b2545] underline-offset-4 hover:underline">
+              Team queue
+            </Link>
+          </div>
+          <TicketList tickets={assigned} empty="Nothing assigned to you right now." />
+        </section>
+      )}
 
       <section>
         <div className="mb-3 flex items-baseline justify-between">

@@ -6,14 +6,14 @@ import type { TicketSummary } from '@/lib/types';
 import { useMe } from '@/components/MeContext';
 import { TicketList } from '@/components/TicketList';
 
-type Scope = 'mine' | 'queue' | 'all';
+type Scope = 'mine' | 'assigned' | 'queue' | 'all';
 type StatusFilter = 'open' | 'closed' | 'any';
 
 export default function Tickets() {
   const me = useMe();
   const scopes: { key: Scope; label: string }[] = [
     { key: 'mine', label: 'Raised by me' },
-    ...(me?.worksTickets ? [{ key: 'queue' as Scope, label: 'My queue' }] : []),
+    ...(me?.worksTickets ? [{ key: 'assigned' as Scope, label: 'Assigned to me' }, { key: 'queue' as Scope, label: 'Team queue' }] : []),
     ...(me?.seesAll ? [{ key: 'all' as Scope, label: 'All tickets' }] : []),
   ];
   const [scope, setScope] = useState<Scope>(me?.worksTickets ? 'queue' : 'mine');
@@ -53,9 +53,9 @@ export default function Tickets() {
       <h1 className="text-2xl font-semibold">Tickets</h1>
       <div className="flex flex-wrap items-center gap-2">
         {scopes.length > 1 && (
-          <div className="flex gap-1 rounded-xl bg-stone-100 p-1">
+          <div className="flex max-w-full gap-1 overflow-x-auto rounded-xl bg-stone-100 p-1">
             {scopes.map((s) => (
-              <button key={s.key} className={tab(scope === s.key)} onClick={() => setScope(s.key)}>
+              <button key={s.key} className={`${tab(scope === s.key)} whitespace-nowrap`} onClick={() => setScope(s.key)}>
                 {s.label}
               </button>
             ))}

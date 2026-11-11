@@ -22,17 +22,20 @@ body {
   overflow: hidden;
 }
 
-.field-label {
-  @apply mb-1 block text-sm font-medium text-stone-800;
-}
-.field-input {
-  @apply w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-base text-stone-900 shadow-xs outline-none focus:border-[#0b2545] focus:ring-2 focus:ring-[#0b2545]/20;
-}
-.field-hint {
-  @apply mt-1 text-xs text-stone-500;
-}
-.field-error {
-  @apply mt-1 text-sm text-rose-700;
+/* In the components layer, so utilities such as w-auto or mt-2 can still override them. */
+@layer components {
+  .field-label {
+    @apply mb-1 block text-sm font-medium text-stone-800;
+  }
+  .field-input {
+    @apply w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-base text-stone-900 shadow-xs outline-none focus:border-[#0b2545] focus:ring-2 focus:ring-[#0b2545]/20;
+  }
+  .field-hint {
+    @apply mt-1 text-xs text-stone-500;
+  }
+  .field-error {
+    @apply mt-1 text-sm text-rose-700;
+  }
 }
 
 /* Amplify sign-in colours: navy instead of the default teal */

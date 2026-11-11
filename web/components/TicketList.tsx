@@ -25,6 +25,7 @@ export function TicketList({ tickets, empty }: { tickets: TicketSummary[]; empty
             </div>
             <div className="flex items-center gap-3 sm:flex-col sm:items-end sm:gap-1">
               <StatusBadge status={t.status} />
+              {t.assignee && <span className="text-xs text-stone-600">{t.assignee}</span>}
               <span className="text-xs text-stone-500">{when(t.createdAt)}</span>
             </div>
           </Link>

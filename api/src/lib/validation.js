@@ -55,7 +55,7 @@ const uploadRequestSchema = z.object({
 });
 
 const listQuerySchema = z.object({
-  scope: z.enum(['mine', 'all', 'queue']).optional().default('mine'),
+  scope: z.enum(['mine', 'assigned', 'all', 'queue']).optional().default('mine'),
   status: z.enum(['open', 'closed', 'any']).optional().default('any'),
   limit: z.coerce.number().int().min(1).max(100).optional().default(25),
   before: z.coerce.number().int().positive().optional(),

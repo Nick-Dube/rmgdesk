@@ -87,6 +87,46 @@ function button(href, label) {
       </tr>`;
 }
 
+/** Two buttons side by side (stack on narrow phones): the main choice in navy, the other outlined. */
+function buttonPair(primary, secondary) {
+  const cell = (b, solid) => {
+    const url = esc(b.href);
+    const bg = solid ? NAVY : '#ffffff';
+    const fg = solid ? '#ffffff' : NAVY;
+    return `<td valign="top" style="padding:0 12px 10px 0;">
+          <!--[if mso]>
+          <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${url}" style="height:44px;v-text-anchor:middle;width:230px;" arcsize="10%" strokecolor="${NAVY}" fillcolor="${bg}">
+            <w:anchorlock/><center style="color:${fg};font-family:Segoe UI,Arial,sans-serif;font-size:15px;font-weight:bold;">${esc(b.label)}</center>
+          </v:roundrect>
+          <![endif]-->
+          <!--[if !mso]><!-- -->
+          <a href="${url}" style="display:inline-block;background-color:${bg};color:${fg};border:2px solid ${NAVY};${FONT}font-size:15px;font-weight:bold;line-height:40px;text-align:center;text-decoration:none;width:226px;border-radius:4px;">${esc(b.label)}</a>
+          <!--<![endif]-->
+        </td>`;
+  };
+  return `
+      <tr>
+        <td style="padding:24px 20px 0 32px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="left"><tr>${cell(primary, true)}</tr></table>
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="left"><tr>${cell(secondary, false)}</tr></table>
+        </td>
+      </tr>`;
+}
+
+/** A highlighted box with a coloured bar on the left (no emoji: some mail systems turn them into "??"). */
+function callout(html, colour = NAVY, background = '#f2f6fb') {
+  return `
+      <tr>
+        <td style="padding:18px 32px 0 32px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td bgcolor="${background}" style="background-color:${background};border-left:5px solid ${colour};padding:14px 18px;${FONT}font-size:15px;line-height:23px;color:#22272e;">${html}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>`;
+}
+
 /** Photo thumbnails, embedded in the email (cid: links), two per row. */
 function photoGrid(photos) {
   if (!photos.length) return '';
@@ -156,4 +196,4 @@ function redirectBanner(intended) {
       </tr>`;
 }
 
-module.exports = { FONT, esc, escMultiline, priorityBadge, section, rows, paragraph, button, photoGrid, shell, redirectBanner };
+module.exports = { FONT, NAVY, esc, escMultiline, priorityBadge, section, rows, paragraph, button, buttonPair, callout, photoGrid, shell, redirectBanner };
