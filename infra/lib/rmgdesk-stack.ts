@@ -16,6 +16,7 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as secrets from 'aws-cdk-lib/aws-secretsmanager';
 import * as ses from 'aws-cdk-lib/aws-ses';
 import * as budgets from 'aws-cdk-lib/aws-budgets';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as apigw from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import { HttpJwtAuthorizer } from 'aws-cdk-lib/aws-apigatewayv2-authorizers';
@@ -147,7 +148,7 @@ export class RmgDeskStack extends Stack {
         secretStringTemplate: JSON.stringify({
           url: 'https://vertex.fsicloud.com/Evolution/webservices/workflowrest.aspx',
           workflow: 'RMGRaiseTask',
-          username: 'VTXWebservice',
+          username: 'CHANGE_ME',
           enabled: false,
         }),
         generateStringKey: 'password',
@@ -188,6 +189,18 @@ export class RmgDeskStack extends Stack {
       queueName: `${prefix}-integrations`,
       visibilityTimeout: Duration.seconds(120),
       deadLetterQueue: { queue: integrationsDlq, maxReceiveCount: 5 },
+      enforceSSL: true,
+    });
+
+    const notificationsDlq = new sqs.Queue(this, 'NotificationsDlq', {
+      queueName: `${prefix}-notifications-dlq`,
+      retentionPeriod: Duration.days(14),
+      enforceSSL: true,
+    });
+    const notificationsQueue = new sqs.Queue(this, 'NotificationsQueue', {
+      queueName: `${prefix}-notifications`,
+      visibilityTimeout: Duration.seconds(120),
+      deadLetterQueue: { queue: notificationsDlq, maxReceiveCount: 5 },
       enforceSSL: true,
     });
 
@@ -240,6 +253,7 @@ export class RmgDeskStack extends Stack {
       DB_SECRET_ARN: db.secret!.secretArn,
       ATTACHMENTS_BUCKET: attachments.bucketName,
       INTEGRATIONS_QUEUE_URL: integrationsQueue.queueUrl,
+      NOTIFICATIONS_QUEUE_URL: notificationsQueue.queueUrl,
       ENV_NAME: cfg.name,
       APP_URL: cfg.appOrigins[0],
       NODE_OPTIONS: '--enable-source-maps',
@@ -275,7 +289,26 @@ export class RmgDeskStack extends Stack {
       environment: { ...dbEnv, EVOLUTION_SECRET_ARN: evolutionSecret.secretArn },
     });
 
-    for (const f of [meFn, referenceFn, ticketsFn, uploadsFn, evolutionWorker]) {
+    const notifier = fn('Notifier', 'notifier.js', {
+      timeout: Duration.seconds(60),
+      environment: {
+        ...dbEnv,
+        EMAIL_FROM: `RMG Helpdesk <${cfg.fromAddress}>`,
+        EMAIL_MODE: cfg.emailMode,
+        EMAIL_REDIRECT_TO: cfg.emailRedirectTo,
+      },
+    });
+    attachments.grantRead(notifier); // photos are embedded in the email
+    notifier.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+        resources: [`arn:aws:ses:${this.region}:${this.account}:identity/*`],
+      }),
+    );
+    notificationsQueue.grantSendMessages(ticketsFn);
+    notifier.addEventSource(new SqsEventSource(notificationsQueue, { batchSize: 1, reportBatchItemFailures: true }));
+
+    for (const f of [meFn, referenceFn, ticketsFn, uploadsFn, evolutionWorker, notifier]) {
       db.secret!.grantRead(f);
     }
     attachments.grantPut(uploadsFn);
@@ -408,7 +441,12 @@ export class RmgDeskStack extends Stack {
       integrationsDlq.metricApproximateNumberOfMessagesVisible({ period: Duration.minutes(5) }),
       'A message reached the integrations dead-letter queue: a ticket did not reach MRI Evolution.',
     );
-    for (const [id, f] of [['TicketsErrors', ticketsFn], ['EvolutionErrors', evolutionWorker]] as const) {
+    alarm(
+      'NotificationsDlqAlarm',
+      notificationsDlq.metricApproximateNumberOfMessagesVisible({ period: Duration.minutes(5) }),
+      'A message reached the notifications dead-letter queue: new-ticket emails were not sent.',
+    );
+    for (const [id, f] of [['TicketsErrors', ticketsFn], ['EvolutionErrors', evolutionWorker], ['NotifierErrors', notifier]] as const) {
       alarm(`${id}Alarm`, f.metricErrors({ period: Duration.minutes(5) }), `${f.node.id} Lambda errors`);
     }
 

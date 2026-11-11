@@ -35,6 +35,9 @@ export interface EnvConfig {
   createSesIdentity: boolean;
   emailDomain: string;
   fromAddress: string;
+  emailMode: string,
+  emailRedirectTo: string,
+
 
   // Protection
   /** Protect the database and user pool from accidental deletion. */
@@ -58,6 +61,8 @@ export const environments: Record<string, EnvConfig> = {
     createSesIdentity: true,
     emailDomain: 'rmgdesk.com',
     fromAddress: 'no-reply@rmgdesk.com',
+    emailMode: 'redirect',
+    emailRedirectTo: 'nick.dube@vertex.net',
     retainData: true,
   },
   staging: {
@@ -76,6 +81,8 @@ export const environments: Record<string, EnvConfig> = {
     createSesIdentity: false,
     emailDomain: 'rmgdesk.com',
     fromAddress: 'no-reply@rmgdesk.com',
+    emailMode: 'redirect',
+    emailRedirectTo: 'nick.dube@vertex.net',
     retainData: false,
   },
 };

@@ -148,6 +148,21 @@ async function createTicket(event, user) {
     }
   }
 
+  // Emails to the owning team and the requester are sent by the notifier, so a slow or failed email
+  // never delays or loses the ticket.
+  if (process.env.NOTIFICATIONS_QUEUE_URL) {
+    try {
+      await sqs.send(
+        new SendMessageCommand({
+          QueueUrl: process.env.NOTIFICATIONS_QUEUE_URL,
+          MessageBody: JSON.stringify({ type: 'ticket.created', ticketId: result.ticketId }),
+        }),
+      );
+    } catch (err) {
+      log('error', 'Could not queue the new-ticket emails', { ticketId: result.ticketId, error: err.message });
+    }
+  }
+
   log('info', 'ticket created', { ticketId: result.ticketId, reference: result.reference, userId: user.id });
   return json(201, { id: result.ticketId, reference: result.reference });
 }

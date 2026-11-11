@@ -117,3 +117,25 @@ test('helpdesk API end to end', { skip: !enabled && 'set DB_USER to run against 
     await closePool();
   }
 });
+
+test('new-ticket emails are worked out and recorded (email switched off)', { skip: !enabled && 'set DB_USER to run against a database' }, async () => {
+  process.env.EMAIL_MODE = 'off';
+  const { query, closePool } = require('../src/lib/db');
+  const { ticketCreated } = require('../src/handlers/notifier')._internal;
+  try {
+    const t = (
+      await query(
+        `SELECT t.id FROM tickets t JOIN categories c ON c.id = t.category_id WHERE c.label = 'Grounds' ORDER BY t.id DESC LIMIT 1`,
+      )
+    )[0];
+    assert.ok(t, 'needs the Grounds ticket from the end-to-end test');
+    await ticketCreated(t.id);
+    const notes = await query("SELECT body FROM ticket_events WHERE ticket_id = ? AND type = 'email_sent' ORDER BY id", [t.id]);
+    assert.equal(notes.length, 2, 'team email and requester confirmation');
+    assert.match(notes[0].body, /mwroblewski@rmg\.co\.uk/);
+    assert.match(notes[0].body, /dfhayler@rmg\.co\.uk \(cc\)/);
+    assert.match(notes[1].body, /@rmg\.co\.uk/);
+  } finally {
+    await closePool();
+  }
+});
