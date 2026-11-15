@@ -71,7 +71,7 @@ function SignInHeader() {
 function SignInFooter() {
   return (
     <p className="px-8 pb-6 text-center text-sm text-stone-500">
-      In an emergency, call Security Control on <strong>6555</strong>.<br>Helpdesk 0208 312 6708.</br>
+      In an emergency, call Security Control on <strong>6555</strong>. <br></br>Helpdesk 0208 312 6708.
     </p>
   );
 }
