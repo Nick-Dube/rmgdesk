@@ -306,6 +306,9 @@ export class RmgDeskStack extends Stack {
         EMAIL_FROM: `RMG Helpdesk <${cfg.fromAddress}>`,
         EMAIL_MODE: cfg.emailMode,
         EMAIL_REDIRECT_TO: cfg.emailRedirectTo,
+        // Who emails the requester when an MRI Evolution task completes: 'evolution' (its own workflow email)
+        // or 'rmgdesk' (the "Is it fixed?" email). Switch to 'rmgdesk' only once Evolution stops its email for RMG- tasks.
+        EVOLUTION_COMPLETION_EMAIL: 'evolution',
       },
     });
     attachments.grantRead(notifier); // photos are embedded in the email
@@ -450,6 +453,27 @@ export class RmgDeskStack extends Stack {
     api.addRoutes({ path: '/tickets/{id}/comments', methods: [apigw.HttpMethod.POST], integration: ticketsInt });
     api.addRoutes({ path: '/tickets/{id}/actions', methods: [apigw.HttpMethod.POST], integration: ticketsInt });
     api.addRoutes({ path: '/tickets/{id}/assignees', methods: [apigw.HttpMethod.GET], integration: ticketsInt });
+
+    // MRI Evolution -> RMG Desk: task status changes. Evolution has no Cognito login, so this route skips the
+    // JWT authoriser and the function checks a shared token instead.
+    const evolutionWebhookToken = new secrets.Secret(this, 'EvolutionWebhookToken', {
+      secretName: `${prefix}/evolution-webhook-token`,
+      description: 'Token MRI Evolution sends as "Authorization: Bearer <token>" when it posts task status changes.',
+      generateSecretString: { passwordLength: 48, excludePunctuation: true, includeSpace: false },
+    });
+    const evolutionWebhookFn = fn('EvolutionWebhook', 'evolutionWebhook.js', {
+      timeout: Duration.seconds(15),
+      environment: { ...dbEnv, EVOLUTION_WEBHOOK_SECRET_ARN: evolutionWebhookToken.secretArn },
+    });
+    db.secret!.grantRead(evolutionWebhookFn);
+    evolutionWebhookToken.grantRead(evolutionWebhookFn);
+    notificationsQueue.grantSendMessages(evolutionWebhookFn);
+    api.addRoutes({
+      path: '/integrations/evolution/task-status',
+      methods: [apigw.HttpMethod.POST],
+      integration: new HttpLambdaIntegration('EvolutionWebhookInt', evolutionWebhookFn),
+      authorizer: new apigw.HttpNoneAuthorizer(),
+    });
     api.addRoutes({ path: '/insights', methods: [apigw.HttpMethod.GET], integration: new HttpLambdaIntegration('InsightsInt', insightsFn) });
     // One route for the whole admin console; the handler checks the caller is a superuser.
     api.addRoutes({
@@ -491,6 +515,7 @@ export class RmgDeskStack extends Stack {
       ['NotifierErrors', notifier],
       ['AdminErrors', adminFn],
       ['AutoCloseErrors', autoCloseFn],
+      ['EvolutionWebhookErrors', evolutionWebhookFn],
     ] as const) {
       alarm(`${id}Alarm`, f.metricErrors({ period: Duration.minutes(5) }), `${f.node.id} Lambda errors`);
     }
@@ -506,6 +531,8 @@ export class RmgDeskStack extends Stack {
     out('DbSecretArn', db.secret!.secretArn, 'Admin username and password for the database');
     out('BastionInstanceId', bastion.instanceId, 'Use with aws ssm start-session for the database tunnel');
     out('EvolutionSecretArn', evolutionSecret.secretArn, 'Fill in the MRI Evolution credentials here');
+    out('EvolutionWebhookUrl', `${api.apiEndpoint}/integrations/evolution/task-status`, 'MRI Evolution workflows POST task status changes here');
+    out('EvolutionWebhookTokenArn', evolutionWebhookToken.secretArn, 'The token the Evolution workflow sends (Authorization: Bearer ...)');
     out('IntegrationsDlqUrl', integrationsDlq.queueUrl);
   }
 }

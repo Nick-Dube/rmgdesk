@@ -194,7 +194,9 @@ async function actorName(ev) {
 async function ticketStatus({ ticketId, eventId, status }) {
   const ticket = await loadTicket(ticketId);
   if (!ticket || !ticket.requester_email) return;
-  if (ticket.is_evolution_linked) return;
+  // MRI Evolution sends its own completion email for its categories. Set EVOLUTION_COMPLETION_EMAIL=rmgdesk
+  // (and stop Evolution's email for RMG- tasks) to send RMG Desk's "Is it fixed?" email instead.
+  if (ticket.is_evolution_linked && process.env.EVOLUTION_COMPLETION_EMAIL !== 'rmgdesk') return;
   if (ticket.status !== status) {
     log('info', 'Status changed again before the email went; not sending', { ticketId, wanted: status, now: ticket.status });
     return;

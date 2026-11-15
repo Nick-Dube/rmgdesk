@@ -25,3 +25,20 @@ cd infra && npx cdk deploy -c env=prod
 ```
 
 The step-by-step build runbook lives in the "RMG Helpdesk - Build Runbook" document.
+
+## What the API does
+
+| Route | Handler | Who |
+| --- | --- | --- |
+| `GET /me`, `GET /reference` | me, reference | everyone signed in |
+| `POST /tickets`, `GET /tickets?scope=mine\|assigned\|queue\|all` | tickets | everyone (scopes by role) |
+| `GET /tickets/{id}`, `POST /tickets/{id}/comments` | tickets | people who can see the request |
+| `POST /tickets/{id}/actions` | tickets | the team (acknowledge, assign, attending, made safe, hold, resume, complete, cancel, priority, category, reopen) and the requester (confirm fixed, not fixed, withdraw) |
+| `GET /tickets/{id}/assignees` | tickets | the team |
+| `GET /insights?days=30\|90\|365` | insights | staff and viewers |
+| `/admin/...` | admin | RMG and Vertex superusers (people, routing, announcements, audit log) |
+| `POST /integrations/evolution/task-status` | evolutionWebhook | MRI Evolution workflows (shared token, no Cognito): task statuses (ASSIGNED, COMPLETE, CANCELLED) and engineer events (Arrived, Started, Paused). The workflow code is in `docs/evolution-workflow/` |
+
+The rules for who can do what, and which status each action leads to, are in `api/src/lib/workflow.js`.
+Background work: `notifier` (emails, from the notifications queue), `evolutionWorker` (MRI Evolution, from the
+integrations queue) and `autoClose` (weekdays 07:00 UTC: closes requests resolved 3+ working days ago with no answer).

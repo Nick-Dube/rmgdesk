@@ -25,6 +25,7 @@ const ACTION_WORDS: Record<string, string> = {
   not_fixed: 'Not fixed: sent back to the team',
   withdraw: 'Withdrawn',
   auto_close: 'Closed automatically',
+  evolution_assigned: 'Assigned to an engineer',
 };
 
 function parse(data: TicketEvent['data']): Record<string, unknown> {
@@ -49,6 +50,8 @@ function describe(e: TicketEvent): string {
     case 'internal_note':
       return 'Internal note';
     case 'status_changed':
+      if (d.source === 'evolution' && d.action === 'resolve') return 'Completed by Vertex';
+      if (d.source === 'evolution' && d.action === 'hold') return 'Paused by the engineer';
       return ACTION_WORDS[String(d.action)] ?? (d.to ? STATUS_LABEL[d.to as Status] : 'Status changed');
     case 'assigned':
       return 'Assignment';
@@ -194,7 +197,9 @@ function TicketView() {
                 <div className={`rounded-xl p-3 ${e.isInternal ? 'bg-amber-50 ring-1 ring-amber-200' : 'bg-white ring-1 ring-stone-200'}`}>
                   <p className="text-sm">
                     <span className="font-medium">{describe(e)}</span>
-                    {e.actorName && <span className="text-stone-500"> · {e.actorName}</span>}
+                    {(e.actorName || parse(e.data).source === 'evolution') && (
+                      <span className="text-stone-500"> · {e.actorName ?? 'MRI Evolution'}</span>
+                    )}
                     <span className="text-stone-400"> · {when(e.createdAt)}</span>
                   </p>
                   {e.body && <p className="mt-1 whitespace-pre-wrap text-stone-700">{e.body}</p>}
