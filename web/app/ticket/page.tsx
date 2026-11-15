@@ -153,7 +153,12 @@ function TicketView() {
             <StatusBadge status={t.status} />
           </div>
           <h1 className="mt-2 text-2xl font-semibold">{t.title}</h1>
-          {!data.canWork && (
+          {t.source === 'legacy' && (
+            <p className="mt-3 rounded-xl bg-stone-100 px-4 py-3 text-sm text-stone-700">
+              Imported from the previous helpdesk form. It did not record who raised the request or how it was resolved.
+            </p>
+          )}
+          {!data.canWork && t.source !== 'legacy' && (
             <div className="mt-4">
               <Progress status={t.status} />
             </div>
@@ -209,6 +214,7 @@ function TicketView() {
           </ol>
         </section>
 
+{t.source !== 'legacy' && (
         <form onSubmit={send} className="space-y-3 rounded-2xl bg-white p-4 ring-1 ring-stone-200">
           <label htmlFor="comment" className="field-label">Add an update</label>
           <textarea id="comment" rows={3} className="field-input" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Anything that helps: it's got worse, it's been fixed, access details…" />
@@ -226,6 +232,7 @@ function TicketView() {
             </button>
           </div>
         </form>
+        )}
       </div>
 
       <div className="h-fit space-y-4 lg:sticky lg:top-20">
@@ -234,7 +241,7 @@ function TicketView() {
       </div>
       <aside className="space-y-3 rounded-2xl bg-white p-5 text-sm ring-1 ring-stone-200">
         {data.canWork && <Detail label="Status" value={STATUS_LABEL[t.status]} />}
-        <Detail label="Assigned to" value={t.assignee?.name ?? (data.canWork ? 'Nobody yet' : null)} />
+        {t.source !== 'legacy' && <Detail label="Assigned to" value={t.assignee?.name ?? (data.canWork ? 'Nobody yet' : null)} />}
         <Detail label="Site" value={t.site.name} />
         <Detail label="Building" value={t.building} />
         <Detail label="Location" value={t.location} />

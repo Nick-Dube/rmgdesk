@@ -5,7 +5,8 @@
   "description": "RMG Helpdesk Lambda API (Node.js 22, CommonJS)",
   "main": "src/handlers/health.js",
   "scripts": {
-    "test": "node --test \"test/**/*.test.js\""
+    "test": "node --test \"test/**/*.test.js\"",
+    "import-legacy": "node scripts/import-legacy.js"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1166.0",
@@ -14,6 +15,7 @@
     "@aws-sdk/client-sesv2": "^3.1166.0",
     "@aws-sdk/client-sqs": "^3.700.0",
     "@aws-sdk/s3-request-presigner": "^3.700.0",
+    "exceljs": "^4.4.0",
     "mysql2": "^3.11.0",
     "nodemailer": "^10.5.0",
     "zod": "^3.24.0"

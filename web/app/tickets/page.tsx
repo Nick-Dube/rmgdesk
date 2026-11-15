@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import type { TicketSummary } from '@/lib/types';
@@ -50,7 +51,14 @@ export default function Tickets() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Tickets</h1>
+      <div className="flex items-baseline justify-between gap-3">
+        <h1 className="text-2xl font-semibold">Tickets</h1>
+        {(me?.seesAll || me?.worksTickets) && (
+          <Link href="/requests/" className="text-sm font-medium text-[#0b2545] underline-offset-4 hover:underline">
+            Search all requests and export
+          </Link>
+        )}
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         {scopes.length > 1 && (
           <div className="flex max-w-full gap-1 overflow-x-auto rounded-xl bg-stone-100 p-1">

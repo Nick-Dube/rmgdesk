@@ -91,6 +91,7 @@ export interface TicketDetail {
     serviceLineId: number | null;
     serviceLine: string | null;
     isEvolutionLinked: boolean;
+    source: 'web' | 'mobile' | 'email' | 'qr' | 'evolution' | 'legacy';
     assignee: { id: number; name: string } | null;
     department: string | null;
     requester: { name: string | null; email?: string };
@@ -225,6 +226,8 @@ export interface Insights {
   bySite: { label: string; raised: number; open: number }[];
   byCategory: { label: string; raised: number; open: number }[];
   byServiceLine: { label: string; raised: number; open: number; avgDaysToResolve: number | null }[];
-  repeats: { building: string; siteCode: string; category: string; n: number; lastRaised: string; lastTicketId: number }[];
+  repeats: { building: string; siteCode: string; location: string | null; category: string; n: number; lastRaised: string; lastTicketId: number }[];
   rootCauses: { cause: string; n: number }[];
+  byDepartment: { label: string; raised: number; open: number }[];
+  history: { imported: number; importedFrom: string | null; trackedSince: string | null };
 }

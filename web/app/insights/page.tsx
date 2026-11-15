@@ -7,9 +7,14 @@ import { ROOT_CAUSES, STATUS_LABEL, shortDate } from '@/lib/format';
 import type { Insights } from '@/lib/types';
 import { useMe } from '@/components/MeContext';
 
-// Chart colours: one hue for single measures; raised / resolved are a validated pair (CVD-safe on white).
+// Chart colours, checked for colour-blind separation and contrast on white:
+//   one hue for single measures; raised (blue) / resolved (green) as a pair;
+//   donuts: five categorical hues in a fixed order, grey for "Other"; priority as an ordered blue ramp (P1 darkest).
 const RAISED = '#2f5f9e';
-const RESOLVED = '#c4870a';
+const RESOLVED = '#1f8a4c';
+const CATEGORICAL = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4'];
+const OTHER = '#a8a29e';
+const PRIORITY_RAMP: Record<string, string> = { P1: '#104281', P2: '#256abf', P3: '#5598e7', P4: '#9ec5f4' };
 
 const monthFmt = new Intl.DateTimeFormat('en-GB', { month: 'short' });
 const monthLong = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric' });
@@ -37,9 +42,9 @@ export default function InsightsPage() {
           <p className="text-sm text-stone-600">{data?.scope === 'teams' ? 'Requests for your teams.' : 'Every request on the estate.'}</p>
         </div>
         <div className="flex gap-1 rounded-xl bg-stone-100 p-1" role="group" aria-label="Period">
-          {[30, 90, 365].map((d) => (
+          {[30, 90, 365, 0].map((d) => (
             <button key={d} onClick={() => setDays(d)} aria-pressed={days === d} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${days === d ? 'bg-[#0b2545] text-white' : 'text-stone-600 hover:bg-stone-200'}`}>
-              {d === 365 ? '12 months' : `${d} days`}
+              {d === 0 ? 'All time' : d === 365 ? '12 months' : `${d} days`}
             </button>
           ))}
         </div>
@@ -61,7 +66,14 @@ export default function InsightsPage() {
             />
           </div>
 
-          <Card title="Raised and resolved, by month" action={<button onClick={() => setTable((t) => !t)} className="text-sm font-medium text-[#0b2545] underline-offset-4 hover:underline">{table ? 'Show chart' : 'Show table'}</button>}>
+          <Card
+            title="Raised and resolved, by month"
+            subtitle={
+              data.history.imported && data.history.trackedSince
+                ? `Before ${monthLong.format(new Date(data.history.trackedSince))}, only raised counts exist: those requests came from the old form, which did not record outcomes.`
+                : undefined
+            }
+            action={<button onClick={() => setTable((t) => !t)} className="text-sm font-medium text-[#0b2545] underline-offset-4 hover:underline">{table ? 'Show chart' : 'Show table'}</button>}>
             {table ? <TrendTable trend={data.trend} /> : <Trend trend={data.trend} />}
           </Card>
 
@@ -69,8 +81,21 @@ export default function InsightsPage() {
             <Card title="Open requests by age" subtitle="How long open requests have been waiting">
               <Bars rows={data.backlog.ageing.map((r) => ({ label: r.label, value: r.n }))} ordered />
             </Card>
+            <Card title="Open requests by priority">
+              <Donut
+                unit="open"
+                slices={(['P1', 'P2', 'P3', 'P4'] as const).map((p) => ({
+                  label: p,
+                  value: data.backlog.byPriority.find((x) => x.label === p)?.n ?? 0,
+                  colour: PRIORITY_RAMP[p],
+                }))}
+              />
+            </Card>
             <Card title="Open requests by status">
               <Bars rows={data.backlog.byStatus.sort((a, b) => b.n - a.n).map((r) => ({ label: STATUS_LABEL[r.label] ?? r.label, value: r.n }))} />
+            </Card>
+            <Card title="By site" subtitle="Raised in the period">
+              <Donut unit="raised" slices={topFive(data.bySite.map((r) => ({ label: r.label, value: r.raised })))} />
             </Card>
             <Card title="By team" subtitle={`Raised in the period, with open now and average days to resolve`}>
               <Bars rows={data.byServiceLine.map((r) => ({ label: r.label, value: r.raised, extra: `${r.open} open${r.avgDaysToResolve !== null ? ` · ${r.avgDaysToResolve} d` : ''}` }))} />
@@ -78,21 +103,30 @@ export default function InsightsPage() {
             <Card title="By category" subtitle="Top 12, raised in the period">
               <Bars rows={data.byCategory.map((r) => ({ label: r.label, value: r.raised, extra: `${r.open} open` }))} />
             </Card>
-            <Card title="By site">
-              <Bars rows={data.bySite.map((r) => ({ label: r.label, value: r.raised, extra: `${r.open} open` }))} />
+            <Card title="By department" subtitle="Who raises requests, in the period">
+              <Bars rows={data.byDepartment.map((r) => ({ label: r.label, value: r.raised, extra: `${r.open} open` }))} />
             </Card>
             <Card title="Root causes" subtitle="Recorded when a request is completed">
-              <Bars rows={data.rootCauses.map((r) => ({ label: ROOT_CAUSES[r.cause] ?? r.cause, value: r.n, muted: r.cause === 'not_recorded' }))} />
+              <Donut
+                unit="completed"
+                slices={topFive(
+                  data.rootCauses.filter((r) => r.cause !== 'not_recorded').map((r) => ({ label: ROOT_CAUSES[r.cause] ?? r.cause, value: r.n })),
+                )}
+                footnote={(() => {
+                  const n = data.rootCauses.find((r) => r.cause === 'not_recorded')?.n;
+                  return n ? `${n} completed without a cause recorded` : undefined;
+                })()}
+              />
             </Card>
           </div>
 
-          <Card title="Repeat problems" subtitle="The same category in the same building 3 or more times in the period: candidates for a permanent fix">
+          <Card title="Repeat problems" subtitle="The same category at the same place 3 or more times in the period: candidates for a permanent fix">
             {data.repeats.length ? (
               <div className="-mx-5 overflow-x-auto">
                 <table className="w-full min-w-[480px] text-left text-sm">
                   <thead className="text-xs uppercase tracking-wide text-stone-500">
                     <tr>
-                      <th className="px-5 py-2 font-medium">Building</th>
+                      <th className="px-5 py-2 font-medium">Where</th>
                       <th className="px-5 py-2 font-medium">Category</th>
                       <th className="px-5 py-2 text-right font-medium">Times</th>
                       <th className="px-5 py-2 font-medium">Latest</th>
@@ -100,9 +134,13 @@ export default function InsightsPage() {
                   </thead>
                   <tbody className="divide-y divide-stone-100">
                     {data.repeats.map((r) => (
-                      <tr key={`${r.building}-${r.category}`}>
+                      <tr key={`${r.building}-${r.location}-${r.category}`}>
                         <td className="px-5 py-2.5">
-                          {r.building} <span className="text-stone-400">{r.siteCode}</span>
+                          {r.location || r.building}
+                          <span className="block text-xs text-stone-500">
+                            {r.location ? `${r.building} · ` : ''}
+                            {r.siteCode}
+                          </span>
                         </td>
                         <td className="px-5 py-2.5">{r.category}</td>
                         <td className="px-5 py-2.5 text-right font-semibold tabular-nums">{r.n}</td>
@@ -260,5 +298,86 @@ function Legend({ colour, label }: { colour: string; label: string }) {
       <span className="h-2.5 w-2.5 rounded-sm" style={{ background: colour }} />
       {label}
     </span>
+  );
+}
+
+type Slice = { label: string; value: number; colour?: string };
+
+/** The five largest in fixed colour order; the rest folded into "Other" (grey). */
+function topFive(rows: { label: string; value: number }[]): Slice[] {
+  const sorted = [...rows].filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
+  const head = sorted.slice(0, sorted.length > 5 ? 4 : 5).map((r, i) => ({ ...r, colour: CATEGORICAL[i] }));
+  const tail = sorted.slice(head.length);
+  return tail.length ? [...head, { label: 'Other', value: tail.reduce((n, r) => n + r.value, 0), colour: OTHER }] : head;
+}
+
+/** A donut for a whole split into a few parts: total in the middle, a legend with figures beside it. */
+function Donut({ slices, unit, footnote }: { slices: Slice[]; unit: string; footnote?: string }) {
+  const [hover, setHover] = useState<number | null>(null);
+  const total = slices.reduce((n, s) => n + s.value, 0);
+  if (!total) return <p className="text-stone-500">Nothing in this period.</p>;
+  const R = 70;
+  const W = 22;
+  const C = 2 * Math.PI * R;
+  const GAP = slices.filter((s) => s.value).length > 1 ? 2 : 0; // a hairline of white between segments
+  let at = 0;
+  const pct = (v: number) => (v && (100 * v) / total < 1 ? '<1%' : `${Math.round((100 * v) / total)}%`);
+  const focus = hover !== null ? slices[hover] : null;
+
+  return (
+    <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
+      <svg viewBox="0 0 180 180" className="h-40 w-40 shrink-0" role="img" aria-label={slices.map((s) => `${s.label}: ${s.value}`).join(', ')}>
+        <circle cx="90" cy="90" r={R} fill="none" stroke="#f5f5f4" strokeWidth={W} />
+        {slices.map((s, i) => {
+          const len = (s.value / total) * C;
+          const dash = Math.max(0, len - GAP);
+          const el = s.value ? (
+            <circle
+              key={s.label}
+              cx="90"
+              cy="90"
+              r={R}
+              fill="none"
+              stroke={s.colour}
+              strokeWidth={hover === i ? W + 6 : W}
+              strokeDasharray={`${dash} ${C - dash}`}
+              strokeDashoffset={-at}
+              transform="rotate(-90 90 90)"
+              style={{ transition: 'stroke-width 120ms' }}
+              onMouseEnter={() => setHover(i)}
+              onMouseLeave={() => setHover(null)}
+            >
+              <title>{`${s.label}: ${s.value.toLocaleString('en-GB')} (${pct(s.value)})`}</title>
+            </circle>
+          ) : null;
+          at += len;
+          return el;
+        })}
+        <text x="90" y="88" textAnchor="middle" className="fill-stone-900" style={{ fontSize: 26, fontWeight: 600 }}>
+          {(focus ? focus.value : total).toLocaleString('en-GB')}
+        </text>
+        <text x="90" y="108" textAnchor="middle" className="fill-stone-500" style={{ fontSize: 11 }}>
+          {focus ? `${focus.label} · ${pct(focus.value)}` : unit}
+        </text>
+      </svg>
+      <div className="w-full min-w-0 flex-1">
+        <ul className="space-y-1">
+          {slices.map((s, i) => (
+            <li
+              key={s.label}
+              onMouseEnter={() => setHover(i)}
+              onMouseLeave={() => setHover(null)}
+              className={`flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm ${hover === i ? 'bg-stone-100' : ''}`}
+            >
+              <span className="h-3 w-3 shrink-0 rounded-sm" style={{ background: s.colour }} />
+              <span className="min-w-0 flex-1 leading-snug text-stone-700">{s.label}</span>
+              <span className="tabular-nums font-semibold text-stone-900">{s.value.toLocaleString('en-GB')}</span>
+              <span className="w-10 text-right tabular-nums text-xs text-stone-500">{pct(s.value)}</span>
+            </li>
+          ))}
+        </ul>
+        {footnote && <p className="mt-2 px-2 text-xs text-stone-500">{footnote}</p>}
+      </div>
+    </div>
   );
 }

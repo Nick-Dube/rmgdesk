@@ -178,6 +178,8 @@ export class RmgDeskStack extends Stack {
         { abortIncompleteMultipartUploadAfter: Duration.days(1) },
         // Uploads never attached to a ticket are removed after 7 days.
         { prefix: 'uploads/', expiration: Duration.days(7) },
+        // Excel and CSV exports are downloaded straight away; keep them a day at most.
+        { prefix: 'exports/', expiration: Duration.days(1) },
       ],
     });
 
@@ -287,6 +289,8 @@ export class RmgDeskStack extends Stack {
     const ticketsFn = fn('Tickets', 'tickets.js');
     const uploadsFn = fn('Uploads', 'uploads.js');
     const insightsFn = fn('Insights', 'insights.js', { timeout: Duration.seconds(20) });
+    // Excel / CSV export of the requests table: builds the file, saves it to S3, returns a download link.
+    const exportFn = fn('ExportTickets', 'exportTickets.js', { timeout: Duration.seconds(29), memorySize: 1536 });
     // Closes requests resolved more than 3 working days ago with no answer from the requester.
     const autoCloseFn = fn('AutoClose', 'autoClose.js', { timeout: Duration.seconds(60) });
     new events.Rule(this, 'AutoCloseSchedule', {
@@ -321,12 +325,13 @@ export class RmgDeskStack extends Stack {
     notificationsQueue.grantSendMessages(ticketsFn);
     notifier.addEventSource(new SqsEventSource(notificationsQueue, { batchSize: 1, reportBatchItemFailures: true }));
 
-    for (const f of [meFn, referenceFn, ticketsFn, uploadsFn, evolutionWorker, notifier, insightsFn, autoCloseFn]) {
+    for (const f of [meFn, referenceFn, ticketsFn, uploadsFn, evolutionWorker, notifier, insightsFn, autoCloseFn, exportFn]) {
       db.secret!.grantRead(f);
     }
     attachments.grantPut(uploadsFn);
     attachments.grantReadWrite(ticketsFn); // check uploads, copy them into the ticket's folder
     attachments.grantDelete(ticketsFn); // remove the temporary upload afterwards
+    attachments.grantReadWrite(exportFn, 'exports/*');
     integrationsQueue.grantSendMessages(ticketsFn);
     evolutionSecret.grantRead(evolutionWorker);
     evolutionWorker.addEventSource(new SqsEventSource(integrationsQueue, { batchSize: 1, reportBatchItemFailures: true }));
@@ -453,6 +458,9 @@ export class RmgDeskStack extends Stack {
     api.addRoutes({ path: '/tickets/{id}/comments', methods: [apigw.HttpMethod.POST], integration: ticketsInt });
     api.addRoutes({ path: '/tickets/{id}/actions', methods: [apigw.HttpMethod.POST], integration: ticketsInt });
     api.addRoutes({ path: '/tickets/{id}/assignees', methods: [apigw.HttpMethod.GET], integration: ticketsInt });
+    api.addRoutes({ path: '/tickets/search', methods: [apigw.HttpMethod.GET], integration: ticketsInt });
+    api.addRoutes({ path: '/tickets/filters', methods: [apigw.HttpMethod.GET], integration: ticketsInt });
+    api.addRoutes({ path: '/tickets/export', methods: [apigw.HttpMethod.POST], integration: new HttpLambdaIntegration('ExportInt', exportFn) });
 
     // MRI Evolution -> RMG Desk: task status changes. Evolution has no Cognito login, so this route skips the
     // JWT authoriser and the function checks a shared token instead.

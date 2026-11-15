@@ -22,6 +22,7 @@ const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client
 const { query, withTransaction } = require('../lib/db');
 const { notify } = require('../lib/queue');
 const { OPEN } = require('../lib/workflow');
+const { parseWhen } = require('../lib/time');
 
 const MAX_BODY = 64 * 1024;
 const ATTEND_EVENTS = ['ARRIVED', 'STARTED', 'RESUMED'];
@@ -53,27 +54,7 @@ const log = (level, message, extra = {}) => console.log(JSON.stringify({ level, 
 const text = (max) => z.string().trim().max(max).optional().nullable().transform((v) => v || null);
 const upper = (max) => text(max).transform((v) => (v ? v.toUpperCase() : null));
 const id = z.union([z.string(), z.number()]).optional().nullable().transform((v) => (v === null || v === undefined || String(v).trim() === '' ? null : String(v).trim()));
-// Dates: ISO 8601. With a zone (2026-11-14T10:05:00Z or +01:00) they are taken as given. Without one
-// (2026-11-14T10:05:00, as Evolution workflows send them) they are UK local time, GMT or BST.
-const LOCAL = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/;
-const london = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-/** Minutes London is ahead of UTC at this instant (0 in winter, 60 in summer). */
-function londonOffset(ms) {
-  const f = Object.fromEntries(london.formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
-  return (Date.UTC(+f.year, +f.month - 1, +f.day, +f.hour, +f.minute, +f.second) - Math.floor(ms / 1000) * 1000) / 60000;
-}
-function fromLondon(y, mo, d, h, mi, s) {
-  const wall = Date.UTC(y, mo - 1, d, h, mi, s);
-  let utc = wall - londonOffset(wall) * 60000;
-  utc = wall - londonOffset(utc) * 60000; // second pass settles the hour the clocks change
-  return new Date(utc);
-}
-function parseWhen(v) {
-  if (!v) return null;
-  const m = LOCAL.exec(String(v).trim());
-  const d = m ? fromLondon(+m[1], +m[2], +m[3], +m[4], +m[5], +(m[6] || 0)) : new Date(v);
-  return Number.isNaN(d.getTime()) || d.getUTCFullYear() < 2015 ? null : d;
-}
+// Dates: ISO 8601. Without a zone (as Evolution workflows send them) they are UK local time: see lib/time.js.
 const when = z.string().optional().nullable().transform(parseWhen);
 
 const payloadSchema = z

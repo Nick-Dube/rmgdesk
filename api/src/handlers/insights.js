@@ -1,12 +1,15 @@
 'use strict';
-// GET /insights?days=30|90|365 - the numbers behind the Insights page, for staff and viewers.
+// GET /insights?days=30|90|365|0 (0 = all time) - the numbers behind the Insights page, for staff and viewers.
 // Everything is limited to the tickets the caller may see (a team lead sees their teams; superusers see all).
 //
 //   summary      open now, raised and resolved in the period, average days to resolve, reopen rate, satisfaction
 //   backlog      open requests by age, by status and by priority
 //   trend        raised and resolved per month, last 12 months
 //   bySite, byCategory, byServiceLine
-//   repeats      the same category in the same building 3+ times in the period: candidates for a permanent fix
+//   byDepartment who raises the most
+//   repeats      the same fault category at the same place (building and location) 3+ times in the period:
+//                candidates for a permanent fix
+//   history      imported requests from the old form (no outcome recorded) and when RMG Desk tracking started
 //   rootCauses   why things broke, from the resolution form
 
 const { z } = require('zod');
@@ -21,24 +24,28 @@ exports.handler = wrap(async (event) => {
   const user = await resolveUser(event);
   if (!user.seesAll && !user.worksTickets) throw new HttpError(403, 'Insights are for helpdesk staff and viewers.');
   const { days } = z
-    .object({ days: z.coerce.number().int().refine((d) => [30, 90, 365].includes(d), 'Choose 30, 90 or 365 days.').optional().default(90) })
+    .object({ days: z.coerce.number().int().refine((d) => [30, 90, 365, 0].includes(d), 'Choose 30, 90, 365 or 0 (all time).').optional().default(90) })
     .parse(event.queryStringParameters || {});
 
   const vis = visibilityFilter(user);
   const V = vis.sql;
   const P = vis.params;
-  const since = `t.created_at >= DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL ${days} DAY)`; // days is one of three integers
+  // days is one of four integers, so it is safe in the SQL. 0 = all time.
+  const since = days ? `t.created_at >= DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL ${days} DAY)` : 't.created_at IS NOT NULL';
+  const resolvedSince = days ? `t.resolved_at >= DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL ${days} DAY)` : 't.resolved_at IS NOT NULL';
+  const live = "t.source <> 'legacy'"; // imported history has no outcome, so it is left out of outcome measures
 
-  const [summary, ageing, byStatus, byPriority, trend, bySite, byCategory, byServiceLine, repeats, rootCauses] = await Promise.all([
+  const [summary, ageing, byStatus, byPriority, trend, bySite, byCategory, byServiceLine, repeats, rootCauses, byDepartment, history] = await Promise.all([
     query(
       `SELECT
          SUM(${IN_OPEN}) AS openNow,
          SUM(${IN_OPEN} AND t.priority = 'P1') AS openP1,
          SUM(${since}) AS raised,
-         SUM(t.resolved_at >= DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL ${days} DAY)) AS resolved,
-         AVG(CASE WHEN t.resolved_at >= DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL ${days} DAY)
+         SUM(${resolvedSince}) AS resolved,
+         AVG(CASE WHEN ${resolvedSince}
                   THEN TIMESTAMPDIFF(MINUTE, t.created_at, t.resolved_at) END) / 1440 AS avgDaysToResolve,
-         SUM(${since} AND t.reopen_count > 0) AS reopened,
+         SUM(${since} AND ${live}) AS raisedLive,
+         SUM(${since} AND ${live} AND t.reopen_count > 0) AS reopened,
          AVG(CASE WHEN ${since} THEN t.satisfaction END) AS satisfaction,
          SUM(${since} AND t.satisfaction IS NOT NULL) AS ratings
        FROM tickets t WHERE ${V}`,
@@ -87,18 +94,31 @@ exports.handler = wrap(async (event) => {
       [...OPEN, ...P],
     ),
     query(
-      `SELECT b.name AS building, s.code AS siteCode, c.label AS category, COUNT(*) AS n,
+      `SELECT b.name AS building, s.code AS siteCode, MIN(t.location_text) AS location, c.label AS category, COUNT(*) AS n,
               MAX(t.created_at) AS lastRaised, MAX(t.id) AS lastTicketId
          FROM tickets t JOIN buildings b ON b.id = t.building_id JOIN sites s ON s.id = t.site_id JOIN categories c ON c.id = t.category_id
-        WHERE ${since} AND t.status <> 'cancelled' AND ${V}
-        GROUP BY b.id, b.name, s.code, c.id, c.label HAVING COUNT(*) >= 3
-        ORDER BY n DESC, lastRaised DESC LIMIT 15`,
+        WHERE ${since} AND t.status <> 'cancelled' AND c.is_fault = TRUE AND ${V}
+        GROUP BY b.id, b.name, s.code, LOWER(REPLACE(REPLACE(TRIM(COALESCE(t.location_text, '')), '''', ''), '’', '')), c.id, c.label
+       HAVING COUNT(*) >= 3
+        ORDER BY n DESC, lastRaised DESC LIMIT 20`,
       [...P],
     ),
     query(
       `SELECT COALESCE(t.root_cause, 'not_recorded') AS cause, COUNT(*) AS n
-         FROM tickets t WHERE t.resolved_at >= DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL ${days} DAY) AND ${V}
+         FROM tickets t WHERE ${resolvedSince} AND ${V}
         GROUP BY cause ORDER BY n DESC`,
+      [...P],
+    ),
+    query(
+      `SELECT t.department_name AS label, COUNT(*) AS raised, SUM(${IN_OPEN}) AS open
+         FROM tickets t WHERE ${since} AND t.department_name IS NOT NULL AND t.status <> 'cancelled' AND ${V}
+        GROUP BY t.department_name ORDER BY raised DESC LIMIT 12`,
+      [...OPEN, ...P],
+    ),
+    query(
+      `SELECT SUM(t.source = 'legacy') AS imported, MIN(CASE WHEN t.source = 'legacy' THEN t.created_at END) AS importedFrom,
+              MIN(CASE WHEN t.source <> 'legacy' THEN t.created_at END) AS trackedSince
+         FROM tickets t WHERE ${V}`,
       [...P],
     ),
   ]);
@@ -116,7 +136,7 @@ exports.handler = wrap(async (event) => {
       raised: num(s.raised) || 0,
       resolved: num(s.resolved) || 0,
       avgDaysToResolve: num(s.avgDaysToResolve, 1),
-      reopenRate: s.raised ? num((100 * s.reopened) / s.raised, 1) : null,
+      reopenRate: s.raisedLive ? num((100 * s.reopened) / s.raisedLive, 1) : null,
       satisfaction: num(s.satisfaction, 1),
       ratings: num(s.ratings) || 0,
     },
@@ -130,6 +150,12 @@ exports.handler = wrap(async (event) => {
     byCategory: byCategory.map((r) => ({ label: r.label, raised: num(r.raised), open: num(r.open) })),
     byServiceLine: byServiceLine.map((r) => ({ label: r.label, raised: num(r.raised), open: num(r.open), avgDaysToResolve: num(r.avgDaysToResolve, 1) })),
     repeats: repeats.map((r) => ({ ...r, n: num(r.n) })),
+    byDepartment: byDepartment.map((r) => ({ label: r.label, raised: num(r.raised), open: num(r.open) })),
+    history: {
+      imported: num(history[0]?.imported) || 0,
+      importedFrom: history[0]?.importedFrom || null,
+      trackedSince: history[0]?.trackedSince || null,
+    },
     rootCauses: rootCauses.map((r) => ({ cause: r.cause, n: num(r.n) })),
   });
 });

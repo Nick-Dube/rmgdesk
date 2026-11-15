@@ -6,7 +6,8 @@ import { signOut } from 'aws-amplify/auth';
 import type { ReactNode } from 'react';
 import { useMe } from './MeContext';
 
-const BASE_NAV = [
+type NavItem = { href: string; label: string; short: string; phone?: boolean };
+const BASE_NAV: NavItem[] = [
   { href: '/', label: 'Home', short: 'Home' },
   { href: '/new/', label: 'Raise a request', short: 'Raise' },
   { href: '/tickets/', label: 'Tickets', short: 'Tickets' },
@@ -15,9 +16,12 @@ const BASE_NAV = [
 export function Shell({ children }: { children: ReactNode }) {
   const me = useMe();
   const path = usePathname();
-  const NAV = [
+  const staff = me?.seesAll || me?.worksTickets;
+  const NAV: NavItem[] = [
     ...BASE_NAV,
-    ...(me?.seesAll || me?.worksTickets ? [{ href: '/insights/', label: 'Insights', short: 'Insights' }] : []),
+    // The requests table is a desk-sized page: in the header, not the phone's bottom bar.
+    ...(staff ? [{ href: '/requests/', label: 'Requests', short: 'Requests', phone: false }] : []),
+    ...(staff ? [{ href: '/insights/', label: 'Insights', short: 'Insights' }] : []),
     ...(me?.role === 'rmg_superuser' || me?.role === 'vertex_superuser' ? [{ href: '/admin/', label: 'Admin', short: 'Admin' }] : []),
   ];
   const active = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
@@ -64,9 +68,9 @@ export function Shell({ children }: { children: ReactNode }) {
       {/* Phone navigation: thumb-reachable at the bottom of the screen */}
       <nav
         className="fixed inset-x-0 bottom-0 z-20 grid border-t border-stone-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden"
-        style={{ gridTemplateColumns: `repeat(${NAV.length}, minmax(0, 1fr))` }}
+        style={{ gridTemplateColumns: `repeat(${NAV.filter((n) => n.phone !== false).length}, minmax(0, 1fr))` }}
       >
-        {NAV.map((n) => (
+        {NAV.filter((n) => n.phone !== false).map((n) => (
           <Link
             key={n.href}
             href={n.href}

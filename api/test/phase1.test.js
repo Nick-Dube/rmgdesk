@@ -258,6 +258,8 @@ test('phase 1 end to end', { skip: !enabled && 'set DB_USER to run against a dat
       assert.ok(all.summary.raised >= 6);
       assert.equal(all.backlog.ageing.length, 5);
       assert.ok(all.repeats.some((r) => r.category === 'Grounds' && r.building === 'Queens House'));
+      assert.ok(Array.isArray(all.byDepartment) && 'trackedSince' in all.history);
+      assert.equal((await insights(event('GET /insights', superuser, { query: { days: '0' } }))).statusCode, 200, 'all time');
       assert.ok(all.rootCauses.some((r) => r.cause === 'weather'));
       const team = body(await insights(event('GET /insights', agent, {})));
       assert.equal(team.scope, 'teams');
@@ -364,6 +366,90 @@ test('phase 1 end to end', { skip: !enabled && 'set DB_USER to run against a dat
       assert.ok(log.some((e) => e.action === 'user.offboard' && e.subject === agent.name));
     });
   } finally {
+    await closePool();
+  }
+});
+
+test('imported requests are read-only', () => {
+  const agent = { id: 2, worksTickets: true, seesAll: true, serviceLineIds: [] };
+  const t = { id: 9, requester_id: null, service_line_id: 7, status: 'closed', source: 'legacy' };
+  assert.deepEqual(workflow.allowedActions(agent, t), []);
+  assert.throws(() => workflow.plan(agent, t, 'reopen', { reason: 'x' }), (e) => e.status === 409);
+});
+
+test('requests table search and export', { skip: !process.env.DB_USER && 'set DB_USER to run against a database' }, async (t) => {
+  process.env.AWS_ACCESS_KEY_ID ||= 'test';
+  process.env.AWS_SECRET_ACCESS_KEY ||= 'test';
+  process.env.AWS_REGION ||= 'eu-west-2';
+  process.env.ATTACHMENTS_BUCKET ||= 'test-bucket';
+  const { query, closePool } = require('../src/lib/db');
+  const aws = require('../src/lib/aws');
+  const tickets = require('../src/handlers/tickets').handler;
+  const exporter = require('../src/handlers/exportTickets');
+  const me = require('../src/handlers/me').handler;
+  const ExcelJS = require('exceljs');
+  const put = [];
+  const realSend = aws.s3.send.bind(aws.s3);
+  aws.s3.send = async (cmd) => (cmd.constructor.name === 'PutObjectCommand' ? put.push(cmd.input) && {} : realSend(cmd));
+
+  const stamp = String(Date.now()).slice(-9);
+  const viewer = { sub: `50000000-0000-4000-8000-000${stamp}`, email: `vera.${stamp}@rmg.co.uk`, name: 'Vera Viewer' };
+  const asked = (who, routeKey, extra = {}) => ({
+    routeKey,
+    headers: {},
+    requestContext: { http: { method: routeKey.split(' ')[0] }, authorizer: { jwt: { claims: { sub: who.sub, email: who.email, name: who.name, email_verified: 'true' } } } },
+    ...extra,
+  });
+  const body = (res) => JSON.parse(res.body);
+  try {
+    await me(asked(viewer, 'GET /me'));
+    await query("UPDATE users SET role = 'viewer' WHERE email = ?", [viewer.email]);
+    const search = async (qs) => body(await tickets(asked(viewer, 'GET /tickets/search', { queryStringParameters: qs })));
+
+    await t.test('filters, sorting and paging', async () => {
+      const all = await search({ pageSize: '10' });
+      assert.ok(all.total > 0 && all.rows.length <= 10);
+      const one = all.rows[0];
+      const byRef = await search({ q: one.reference });
+      assert.equal(byRef.total, 1);
+      assert.equal(byRef.rows[0].id, one.id);
+      const p1 = await search({ priority: 'P1,P2', pageSize: '10' });
+      assert.ok(p1.rows.every((r) => ['P1', 'P2'].includes(r.priority)));
+      const open = await search({ status: 'open', sort: 'reference', dir: 'asc', pageSize: '10' });
+      assert.ok(open.rows.every((r) => !['resolved', 'closed', 'cancelled'].includes(r.status)));
+      for (let i = 1; i < open.rows.length; i++) assert.ok(open.rows[i].id > open.rows[i - 1].id, 'sorted by reference');
+      const future = await search({ from: '2099-01-01' });
+      assert.equal(future.total, 0);
+      const bad = await tickets(asked(viewer, 'GET /tickets/search', { queryStringParameters: { status: 'nonsense' } }));
+      assert.equal(bad.statusCode, 400);
+      const choices = body(await tickets(asked(viewer, 'GET /tickets/filters')));
+      assert.ok(choices.sites.length && choices.buildings.length && choices.categories.length && Array.isArray(choices.departments));
+    });
+
+    await t.test('export to Excel and CSV', async () => {
+      const res = await exporter.handler(asked(viewer, 'POST /tickets/export', { body: JSON.stringify({ format: 'xlsx', filters: { priority: 'P3' } }) }));
+      assert.equal(res.statusCode, 200, res.body);
+      const out = body(res);
+      assert.match(out.url, /^https:\/\/test-bucket\.s3\.eu-west-2\.amazonaws\.com\/exports\//);
+      assert.match(out.fileName, /\.xlsx$/);
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(put.at(-1).Body);
+      const ws = wb.getWorksheet('Requests');
+      assert.equal(ws.getRow(1).getCell(1).value, 'Reference');
+      assert.equal(ws.rowCount - 1, out.rows);
+      assert.ok(ws.getRow(2).getCell(2).value instanceof Date, 'Raised is a real date');
+
+      const csv = body(await exporter.handler(asked(viewer, 'POST /tickets/export', { body: JSON.stringify({ format: 'csv', filters: {} }) })));
+      const text = put.at(-1).Body.toString('utf8');
+      assert.ok(text.startsWith('﻿Reference,Raised,Status'));
+      assert.ok(!text.includes('Requester email'), 'viewers do not get requester emails');
+      assert.equal(text.trim().split('\r\n').length - 1 >= csv.rows, true);
+      assert.equal(exporter._internal.csvCell('=HYPERLINK("x")'), '"\'=HYPERLINK(""x"")"', 'formulas are neutralised');
+      const none = await exporter.handler(asked(viewer, 'POST /tickets/export', { body: JSON.stringify({ filters: { from: '2099-01-01' } }) }));
+      assert.equal(none.statusCode, 400);
+    });
+  } finally {
+    aws.s3.send = realSend;
     await closePool();
   }
 });

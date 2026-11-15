@@ -7,6 +7,8 @@
 //   POST /tickets/{id}/actions       change it: acknowledge, assign, attending, made_safe, hold, resume, resolve,
 //                                    cancel, priority, recategorise, reopen; requester: confirm_fixed, not_fixed, withdraw
 //   GET  /tickets/{id}/assignees     people who can be assigned this ticket
+//   GET  /tickets/search?...         the requests table: filters, sorting and pages (see lib/search.js)
+//   GET  /tickets/filters            the choices for the table's filters (sites, buildings, categories, teams, departments)
 
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
@@ -18,6 +20,7 @@ const { s3 } = require('../lib/aws');
 const { notify, integrate } = require('../lib/queue');
 const { checkUploads, attachUploads, tidyUploads } = require('../lib/attachments');
 const workflow = require('../lib/workflow');
+const search = require('../lib/search');
 
 const BUCKET = () => process.env.ATTACHMENTS_BUCKET;
 const WORKER_ROLES = ['agent', 'lead', 'rmg_superuser', 'vertex_helpdesk', 'vertex_superuser'];
@@ -234,6 +237,7 @@ async function getTicket(event, user, idOverride) {
       serviceLineId: t.service_line_id,
       serviceLine: t.service_line_name,
       isEvolutionLinked: Boolean(t.is_evolution_linked),
+      source: t.source,
       assignee: t.assignee_id ? { id: t.assignee_id, name: t.assignee_name } : null,
       department: t.department_name,
       requester: { name: t.requester_name, email: user.worksTickets || t.requester_id === user.id ? t.requester_email : undefined },
@@ -262,7 +266,8 @@ async function addComment(event, user) {
   const id = ticketId(event);
   const input = commentSchema.parse(parseBody(event));
   if (input.isInternal && !user.worksTickets) throw new HttpError(403, 'Only helpdesk staff can add internal notes.');
-  await loadVisibleTicket(id, user);
+  const t = await loadVisibleTicket(id, user);
+  if (t.source === 'legacy') throw new HttpError(409, 'Imported requests from the old form are read-only.');
   const res = await query('INSERT INTO ticket_events (ticket_id, actor_id, type, body, is_internal) VALUES (?, ?, ?, ?, ?)', [
     id,
     user.id,
@@ -470,6 +475,52 @@ async function takeAction(event, user) {
   return updated;
 }
 
+// ------------------------------------------------------------------ requests table
+async function searchTickets(event, user) {
+  const qs = event.queryStringParameters || {};
+  const where = search.buildWhere(user, qs);
+  const page = search.buildOrder(qs);
+  const offset = (page.page - 1) * page.pageSize;
+  const [rows, count] = await Promise.all([
+    query(
+      `SELECT t.id, t.reference, t.created_at AS createdAt, t.status, t.priority, t.title, s.code AS siteCode,
+              b.name AS building, t.location_text AS location, c.label AS category, sl.name AS team,
+              t.department_name AS department, u.full_name AS requester, a.full_name AS assignee, t.source,
+              t.resolved_at AS resolvedAt
+         ${search.FROM}
+        WHERE ${where.sql}
+        ORDER BY ${page.order}
+        LIMIT ${page.pageSize} OFFSET ${offset}`,
+      where.params,
+    ),
+    query(`SELECT COUNT(*) AS n ${search.FROM} WHERE ${where.sql}`, where.params),
+  ]);
+  return json(200, { rows, total: Number(count[0].n), page: page.page, pageSize: page.pageSize });
+}
+
+async function filterChoices(user) {
+  const vis = visibilityFilter(user);
+  const [sites, buildings, categories, teams, departments] = await Promise.all([
+    query('SELECT id, code, name FROM sites ORDER BY sort_order'),
+    query('SELECT id, site_id AS siteId, name FROM buildings ORDER BY sort_order'),
+    query('SELECT id, label, active FROM categories ORDER BY active DESC, label'),
+    query('SELECT id, name FROM service_lines ORDER BY name'),
+    query(
+      `SELECT t.department_name AS name, COUNT(*) AS n FROM tickets t
+        WHERE t.department_name IS NOT NULL AND ${vis.sql}
+        GROUP BY t.department_name ORDER BY n DESC LIMIT 300`,
+      vis.params,
+    ),
+  ]);
+  return json(200, {
+    sites,
+    buildings,
+    categories: categories.map((c) => ({ ...c, active: Boolean(c.active) })),
+    teams,
+    departments: departments.map((d) => d.name),
+  });
+}
+
 // ------------------------------------------------------------------ router
 exports.handler = wrap(async (event) => {
   const user = await resolveUser(event);
@@ -484,6 +535,10 @@ exports.handler = wrap(async (event) => {
       return addComment(event, user);
     case 'POST /tickets/{id}/actions':
       return takeAction(event, user);
+    case 'GET /tickets/search':
+      return searchTickets(event, user);
+    case 'GET /tickets/filters':
+      return filterChoices(user);
     case 'GET /tickets/{id}/assignees':
       return listAssignees(event, user);
     default:

@@ -109,6 +109,7 @@ const ACTIONS = {
 
 /** The actions this user may take on this ticket right now (drives the buttons in the app). */
 function allowedActions(user, t) {
+  if (t.source === 'legacy') return []; // imported history is read-only
   const staff = canWork(user, t);
   const requester = t.requester_id === user.id;
   return Object.entries(ACTIONS)
@@ -119,6 +120,7 @@ function allowedActions(user, t) {
 /** Check an action is allowed and its input is valid. Returns { action, input, nextStatus } or throws { status, message }. */
 function plan(user, t, name, rawInput) {
   const action = ACTIONS[name];
+  if (t.source === 'legacy') throw Object.assign(new Error('Imported requests from the old form are read-only.'), { status: 409 });
   if (!action) throw Object.assign(new Error('Unknown action.'), { status: 400 });
   if (action.who === 'staff' && !canWork(user, t)) throw Object.assign(new Error('Only the team working this request can do that.'), { status: 403 });
   if (action.who === 'requester' && t.requester_id !== user.id) throw Object.assign(new Error('Only the person who raised this request can do that.'), { status: 403 });
