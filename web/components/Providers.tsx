@@ -63,15 +63,15 @@ function SignInHeader() {
     <div className="px-8 pt-8 text-center">
       <img src="/rmg-logo-black.png" alt="Royal Museums Greenwich" className="mx-auto h-16 w-auto" />
       <h1 className="mt-4 text-xl font-semibold text-[#0b2545]">RMG Helpdesk</h1>
-      <p className="mt-1 text-sm text-stone-600">Report and track issues across Royal Museums Greenwich</p>
+      <p className="mt-1 text-base text-stone-600">Report and track issues across Royal Museums Greenwich</p>
     </div>
   );
 }
 
 function SignInFooter() {
   return (
-    <p className="px-8 pb-6 text-center text-xs text-stone-500">
-      In an emergency, call Security Control on <strong>6555</strong>. Helpdesk 0208 312 6708.
+    <p className="px-8 pb-6 text-center text-sm text-stone-500">
+      In an emergency, call Security Control on <strong>6555</strong>.<br>Helpdesk 0208 312 6708.</br>
     </p>
   );
 }
